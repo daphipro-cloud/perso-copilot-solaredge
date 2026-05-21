@@ -87,8 +87,9 @@ Expected:
 ## 9. Operations
 
 1. Add GitHub Actions failure notifications.
-2. Check sync_runs in Supabase weekly.
+2. Run weekly SQL checks from [monitoring-sql-checks.md](monitoring-sql-checks.md).
 3. Keep manual workflow_dispatch available for recovery.
+4. If any check fails, run workflow_dispatch once, then re-run checks.
 
 ## 10. Rollback
 
