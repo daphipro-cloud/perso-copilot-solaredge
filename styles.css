@@ -11,6 +11,13 @@
     --danger: #b3261e;
     --border: rgba(18, 110, 130, 0.25);
     --shadow: 0 18px 45px rgba(13, 31, 45, 0.12);
+    --self-gauge-track: #e7ebf2;
+    --self-gauge-low: #f4605d;
+    --self-gauge-mid: #f9c74f;
+    --self-gauge-good: #39b385;
+    --self-gauge-excellent: #1f8f63;
+    --self-split-self: #2e7cf6;
+    --self-split-export: #f78c6b;
 }
 
 * {
@@ -202,6 +209,79 @@ h1 {
     font-size: 0.8rem;
     font-weight: 600;
     color: var(--text-muted);
+}
+
+.self-rate-gauge {
+    --self-rate: 0%;
+    --self-rate-color: var(--self-gauge-low);
+    width: min(132px, 100%);
+    aspect-ratio: 1;
+    margin: 0.45rem auto 0.5rem;
+    border-radius: 50%;
+    display: grid;
+    place-items: center;
+    background: conic-gradient(
+        from -90deg,
+        var(--self-rate-color) var(--self-rate),
+        var(--self-gauge-track) var(--self-rate) 100%
+    );
+    position: relative;
+}
+
+.self-rate-gauge::before {
+    content: "";
+    position: absolute;
+    inset: 14%;
+    border-radius: 50%;
+    background: #ffffff;
+    box-shadow: inset 0 0 0 1px rgba(28, 43, 51, 0.08);
+}
+
+.self-rate-gauge-inner {
+    position: relative;
+    z-index: 1;
+    text-align: center;
+}
+
+.self-rate-gauge-inner .kpi-value {
+    margin: 0;
+    font-size: clamp(1.2rem, 2.2vw, 1.45rem);
+}
+
+.self-rate-caption {
+    margin: 0.08rem 0 0;
+    color: var(--text-muted);
+    font-size: 0.72rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+}
+
+.self-split-bar {
+    margin-top: 0.1rem;
+    width: 100%;
+    height: 10px;
+    border-radius: 999px;
+    overflow: hidden;
+    display: flex;
+    background: #e8eef5;
+}
+
+.self-split-self,
+.self-split-export {
+    display: block;
+    height: 100%;
+    transition: width 220ms ease;
+}
+
+.self-split-self {
+    width: 0;
+    background: linear-gradient(90deg, #1f6fe8, var(--self-split-self));
+}
+
+.self-split-export {
+    width: 0;
+    background: linear-gradient(90deg, #f67852, var(--self-split-export));
 }
 
 .rate-meter {
@@ -535,6 +615,20 @@ h1 {
 
     .kpi-subtext {
         font-size: 0.72rem;
+    }
+
+    .self-rate-gauge {
+        width: min(94px, 100%);
+        margin-top: 0.25rem;
+        margin-bottom: 0.3rem;
+    }
+
+    .self-rate-caption {
+        font-size: 0.62rem;
+    }
+
+    .self-split-bar {
+        height: 8px;
     }
 
     #energy-chart {

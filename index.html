@@ -51,10 +51,17 @@
             </article>
             <article class="kpi-card">
                 <h2>Self-Consumption Rate</h2>
-                <p id="kpi-self-rate" class="kpi-value">-</p>
-                <div class="rate-meter" role="img" aria-label="Self-consumption rate indicator">
-                    <span id="kpi-self-rate-fill" class="rate-meter-fill"></span>
+                <div id="kpi-self-rate-gauge" class="self-rate-gauge" role="img" aria-label="Self-consumption rate gauge">
+                    <div class="self-rate-gauge-inner">
+                        <p id="kpi-self-rate" class="kpi-value">-</p>
+                        <p class="self-rate-caption">self-used</p>
+                    </div>
                 </div>
+                <div class="self-split-bar" role="img" aria-label="Solar production split between self-use and export">
+                    <span id="kpi-self-solar-fill" class="self-split-self"></span>
+                    <span id="kpi-self-export-fill" class="self-split-export"></span>
+                </div>
+                <p id="kpi-self-split-label" class="kpi-subtext">-</p>
                 <p id="kpi-self-rate-label" class="kpi-subtext">-</p>
             </article>
         </section>

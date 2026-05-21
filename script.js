@@ -8,7 +8,10 @@ const kpiConsumption = document.getElementById("kpi-consumption");
 const kpiProduction = document.getElementById("kpi-production");
 const kpiSelfConsumption = document.getElementById("kpi-self-consumption");
 const kpiSelfRate = document.getElementById("kpi-self-rate");
-const kpiSelfRateFill = document.getElementById("kpi-self-rate-fill");
+const kpiSelfRateGauge = document.getElementById("kpi-self-rate-gauge");
+const kpiSelfSolarFill = document.getElementById("kpi-self-solar-fill");
+const kpiSelfExportFill = document.getElementById("kpi-self-export-fill");
+const kpiSelfSplitLabel = document.getElementById("kpi-self-split-label");
 const kpiSelfRateLabel = document.getElementById("kpi-self-rate-label");
 
 const livePv = document.getElementById("live-pv");
@@ -213,25 +216,54 @@ const fetchJson = async (url) => {
 const renderKpis = (kpis) => {
     const rate = Number(kpis.selfConsumptionRate ?? 0);
     const normalizedRate = Math.max(0, Math.min(100, rate));
+    const productionKwh = Number(kpis.productionKwh ?? 0);
+    const selfConsumptionKwh = Number(kpis.selfConsumptionKwh ?? 0);
+    const exportedKwh = Number(kpis.exportedKwh ?? Math.max(productionKwh - selfConsumptionKwh, 0));
+    const safeProductionKwh = productionKwh > 0 ? productionKwh : 0;
+    const selfShare = safeProductionKwh > 0 ? (selfConsumptionKwh / safeProductionKwh) * 100 : 0;
+    const exportShare = safeProductionKwh > 0 ? (exportedKwh / safeProductionKwh) * 100 : 0;
 
     kpiConsumption.textContent = formatKwh(kpis.consumptionKwh);
     kpiProduction.textContent = formatKwh(kpis.productionKwh);
     kpiSelfConsumption.textContent = formatKwh(kpis.selfConsumptionKwh);
     kpiSelfRate.textContent = formatPercent(normalizedRate);
 
-    if (kpiSelfRateFill) {
-        kpiSelfRateFill.style.width = `${normalizedRate}%`;
+    if (kpiSelfRateGauge) {
+        kpiSelfRateGauge.style.setProperty("--self-rate", `${normalizedRate}%`);
+        let gaugeColor = "var(--self-gauge-low)";
+
+        if (normalizedRate >= 85) {
+            gaugeColor = "var(--self-gauge-excellent)";
+        } else if (normalizedRate >= 65) {
+            gaugeColor = "var(--self-gauge-good)";
+        } else if (normalizedRate >= 45) {
+            gaugeColor = "var(--self-gauge-mid)";
+        }
+
+        kpiSelfRateGauge.style.setProperty("--self-rate-color", gaugeColor);
+    }
+
+    if (kpiSelfSolarFill) {
+        kpiSelfSolarFill.style.width = `${Math.max(0, Math.min(100, selfShare))}%`;
+    }
+
+    if (kpiSelfExportFill) {
+        kpiSelfExportFill.style.width = `${Math.max(0, Math.min(100, exportShare))}%`;
+    }
+
+    if (kpiSelfSplitLabel) {
+        kpiSelfSplitLabel.textContent = `Self-used ${formatKwh(selfConsumptionKwh)} of ${formatKwh(productionKwh)} produced, exported ${formatKwh(exportedKwh)}.`;
     }
 
     if (kpiSelfRateLabel) {
         if (normalizedRate >= 85) {
-            kpiSelfRateLabel.textContent = "Excellent self-usage";
+            kpiSelfRateLabel.textContent = "Excellent self-usage: most production stays at home.";
         } else if (normalizedRate >= 65) {
-            kpiSelfRateLabel.textContent = "Good self-usage";
+            kpiSelfRateLabel.textContent = "Good self-usage: most production is used locally.";
         } else if (normalizedRate >= 45) {
-            kpiSelfRateLabel.textContent = "Moderate self-usage";
+            kpiSelfRateLabel.textContent = "Moderate self-usage: consider shifting loads to solar hours.";
         } else {
-            kpiSelfRateLabel.textContent = "Low self-usage";
+            kpiSelfRateLabel.textContent = "Low self-usage: much of the production is exported.";
         }
     }
 };
