@@ -452,13 +452,14 @@ h1 {
         padding: 0.55rem 0.8rem 0.35rem;
     }
 
+    .eyebrow,
+    .subtitle {
+        display: none;
+    }
+
     h1 {
         margin: 0.15rem 0;
         font-size: clamp(1.05rem, 2.6vw, 1.45rem);
-    }
-
-    .subtitle {
-        font-size: 0.84rem;
     }
 
     .page-main {
@@ -472,6 +473,50 @@ h1 {
     .live-panel {
         padding: 0.55rem 0.65rem;
         border-radius: 14px;
+    }
+
+    .control-panel {
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) auto auto;
+        align-items: center;
+        gap: 0.35rem 0.45rem;
+        padding: 0.45rem 0.6rem;
+    }
+
+    .date-selector {
+        display: flex;
+        align-items: center;
+        gap: 0.35rem;
+        min-width: 0;
+    }
+
+    .date-selector label,
+    .view-toggle-label {
+        display: none;
+    }
+
+    .date-selector input {
+        width: min(40vw, 165px);
+        min-width: 120px;
+        padding: 0.3rem 0.4rem;
+        font-size: 0.8rem;
+    }
+
+    .view-toggle {
+        display: flex;
+        align-items: center;
+        gap: 0.3rem;
+    }
+
+    .view-toggle-actions {
+        gap: 0.28rem;
+    }
+
+    .range-btn,
+    .refresh-btn {
+        padding: 0.34rem 0.52rem;
+        font-size: 0.76rem;
+        line-height: 1.1;
     }
 
     .kpi-grid {
@@ -493,8 +538,8 @@ h1 {
     }
 
     #energy-chart {
-        height: clamp(130px, 34vh, 185px);
-        max-height: 38svh;
+        height: clamp(170px, 46vh, 250px);
+        max-height: 54svh;
     }
 
     .live-grid {
