@@ -139,6 +139,17 @@ h1 {
     gap: 0.3rem 0.75rem;
 }
 
+.date-nav-actions {
+    grid-column: 1 / -1;
+    display: flex;
+    gap: 0.45rem;
+}
+
+.day-nav-btn {
+    min-width: 2.1rem;
+    padding-inline: 0.65rem;
+}
+
 .date-selector label {
     color: var(--text-muted);
     font-size: 0.86rem;
@@ -580,6 +591,11 @@ h1 {
         min-width: 120px;
         padding: 0.3rem 0.4rem;
         font-size: 0.8rem;
+    }
+
+    .date-nav-actions {
+        grid-column: auto;
+        gap: 0.25rem;
     }
 
     .view-toggle {

@@ -1,6 +1,8 @@
 const startDateInput = document.getElementById("start-date");
 const endDateInput = document.getElementById("end-date");
 const refreshButton = document.getElementById("refresh-btn");
+const prevDayButton = document.getElementById("prev-day-btn");
+const nextDayButton = document.getElementById("next-day-btn");
 const chartMeta = document.getElementById("chart-meta");
 const errorBanner = document.getElementById("error-banner");
 
@@ -92,6 +94,29 @@ const parseLabelDate = (label) => {
 const parseIsoDate = (value) => {
     const date = new Date(`${value}T00:00:00`);
     return Number.isNaN(date.getTime()) ? null : date;
+};
+
+const toIsoDate = (date) => {
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, "0");
+    const day = String(date.getDate()).padStart(2, "0");
+    return `${year}-${month}-${day}`;
+};
+
+const shiftDateRangeByDays = (days) => {
+    const startDate = parseIsoDate(startDateInput.value);
+    const endDate = parseIsoDate(endDateInput.value);
+
+    if (!startDate || !endDate) {
+        return;
+    }
+
+    startDate.setDate(startDate.getDate() + days);
+    endDate.setDate(endDate.getDate() + days);
+
+    startDateInput.value = toIsoDate(startDate);
+    endDateInput.value = toIsoDate(endDate);
+    refreshDashboard();
 };
 
 const getRangeLengthInDays = (start, end) => {
@@ -674,5 +699,17 @@ endDateInput.addEventListener("change", () => {
 refreshButton.addEventListener("click", () => {
     refreshDashboard();
 });
+
+if (prevDayButton) {
+    prevDayButton.addEventListener("click", () => {
+        shiftDateRangeByDays(-1);
+    });
+}
+
+if (nextDayButton) {
+    nextDayButton.addEventListener("click", () => {
+        shiftDateRangeByDays(1);
+    });
+}
 
 refreshDashboard();
