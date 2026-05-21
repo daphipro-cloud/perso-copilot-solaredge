@@ -42,21 +42,6 @@
                 <h2>Self-Consumption</h2>
                 <p id="kpi-self-consumption" class="kpi-value">-</p>
             </article>
-            <article class="kpi-card">
-                <h2>Self-Consumption Rate</h2>
-                <div id="kpi-self-rate-gauge" class="self-rate-gauge" role="img" aria-label="Self-consumption rate gauge">
-                    <div class="self-rate-gauge-inner">
-                        <p id="kpi-self-rate" class="kpi-value">-</p>
-                        <p class="self-rate-caption">self-used</p>
-                    </div>
-                </div>
-                <div class="self-split-bar" role="img" aria-label="Solar production split between self-use and export">
-                    <span id="kpi-self-solar-fill" class="self-split-self"></span>
-                    <span id="kpi-self-export-fill" class="self-split-export"></span>
-                </div>
-                <p id="kpi-self-split-label" class="kpi-subtext">-</p>
-                <p id="kpi-self-rate-label" class="kpi-subtext">-</p>
-            </article>
         </section>
 
         <section class="chart-panel" aria-labelledby="energy-chart-title">
@@ -79,20 +64,38 @@
 
         <section class="live-panel" aria-labelledby="live-power-title">
             <h2 id="live-power-title">Live Power Flow</h2>
-            <dl class="live-grid">
-                <div>
-                    <dt>PV</dt>
-                    <dd id="live-pv">-</dd>
-                </div>
-                <div>
-                    <dt>Load</dt>
-                    <dd id="live-load">-</dd>
-                </div>
-                <div>
-                    <dt>Grid</dt>
-                    <dd id="live-grid">-</dd>
-                </div>
-            </dl>
+            <div class="live-panel-stack">
+                <dl class="live-grid">
+                    <div>
+                        <dt>PV</dt>
+                        <dd id="live-pv">-</dd>
+                    </div>
+                    <div>
+                        <dt>Load</dt>
+                        <dd id="live-load">-</dd>
+                    </div>
+                    <div>
+                        <dt>Grid</dt>
+                        <dd id="live-grid">-</dd>
+                    </div>
+                </dl>
+
+                <article class="live-self-rate-card" aria-label="Self-consumption rate details">
+                    <h3>Self-Consumption Rate</h3>
+                    <div id="kpi-self-rate-gauge" class="self-rate-gauge" role="img" aria-label="Self-consumption rate gauge">
+                        <div class="self-rate-gauge-inner">
+                            <p id="kpi-self-rate" class="kpi-value">-</p>
+                            <p class="self-rate-caption">self-used</p>
+                        </div>
+                    </div>
+                    <div class="self-split-bar" role="img" aria-label="Solar production split between self-use and export">
+                        <span id="kpi-self-solar-fill" class="self-split-self"></span>
+                        <span id="kpi-self-export-fill" class="self-split-export"></span>
+                    </div>
+                    <p id="kpi-self-split-label" class="kpi-subtext">-</p>
+                    <p id="kpi-self-rate-label" class="kpi-subtext">-</p>
+                </article>
+            </div>
         </section>
 
         <p id="error-banner" class="error-banner" hidden></p>
