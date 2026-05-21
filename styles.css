@@ -339,6 +339,27 @@ h1 {
     margin: 0;
 }
 
+.chart-header .view-toggle {
+    display: flex;
+    align-items: center;
+    gap: 0.35rem;
+}
+
+.chart-header .view-toggle-label {
+    font-size: 0.78rem;
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
+}
+
+.chart-header .view-toggle-actions {
+    gap: 0.3rem;
+}
+
+.chart-header .view-toggle-actions .range-btn {
+    padding: 0.38rem 0.66rem;
+    font-size: 0.78rem;
+}
+
 #chart-meta {
     margin: 0;
     color: var(--text-muted);
@@ -558,8 +579,9 @@ h1 {
         width: min(42vw, 168px);
     }
 
-    .view-toggle {
+    .chart-header .view-toggle {
         width: 100%;
+        justify-content: center;
     }
 
     .daily-chart-item {
@@ -653,13 +675,13 @@ h1 {
         font-size: 0.67rem;
     }
 
-    .view-toggle {
+    .chart-header .view-toggle {
         display: flex;
         align-items: center;
         gap: 0.3rem;
     }
 
-    .view-toggle-actions {
+    .chart-header .view-toggle-actions {
         gap: 0.28rem;
     }
 

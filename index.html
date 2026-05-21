@@ -18,14 +18,6 @@
 
     <main class="page-main">
         <section class="control-panel" aria-label="Chart controls">
-            <article class="view-toggle" aria-label="Chart view mode">
-                <span class="view-toggle-label">Chart view</span>
-                <div class="view-toggle-actions">
-                    <button type="button" id="view-mode-positive" class="range-btn view-mode-btn is-active" data-view-mode="positive" aria-pressed="true">All Positive</button>
-                    <button type="button" id="view-mode-split" class="range-btn view-mode-btn" data-view-mode="split" aria-pressed="false">Positive / Negative</button>
-                </div>
-            </article>
-
             <button type="button" id="refresh-btn" class="refresh-btn">Refresh</button>
         </section>
 
@@ -55,6 +47,13 @@
                     <label for="end-date" class="sr-only">End date</label>
                     <input type="date" id="end-date" name="endDate">
                     <button type="button" id="next-day-btn" class="range-btn day-nav-btn" aria-label="Move to next day">&gt;</button>
+                </article>
+                <article class="view-toggle" aria-label="Chart view mode">
+                    <span class="view-toggle-label">Chart view</span>
+                    <div class="view-toggle-actions">
+                        <button type="button" id="view-mode-positive" class="range-btn view-mode-btn is-active" data-view-mode="positive" aria-pressed="true">All Positive</button>
+                        <button type="button" id="view-mode-split" class="range-btn view-mode-btn" data-view-mode="split" aria-pressed="false">Positive / Negative</button>
+                    </div>
                 </article>
                 <p id="chart-meta"></p>
             </div>
