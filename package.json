@@ -1,0 +1,19 @@
+{
+  "name": "solaredge-dashboard-starter",
+  "version": "1.0.0",
+  "description": "Starter web app for SolarEdge consumption and self-consumption dashboard",
+  "type": "module",
+  "scripts": {
+    "start": "node server/index.js",
+    "dev": "node scripts/dev-server.mjs",
+    "sync": "node server/sync.js",
+    "sync:cloud": "node scripts/cloud-sync.mjs",
+    "test:unit": "node tests/energyRequest.test.js",
+    "test:solaredge": "node scripts/verify-solaredge.js"
+  },
+  "dependencies": {
+    "dotenv": "^16.6.1",
+    "express": "^4.21.2",
+    "node-fetch": "^3.3.2"
+  }
+}

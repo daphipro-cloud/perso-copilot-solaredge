@@ -1,0 +1,321 @@
+{\rtf1\ansi\deff0
+{\fonttbl
+{\f0 Arial;}
+{\f1 Courier New;}
+}
+\paperw11907\paperh16840\margl1440\margr1440\margt1440\margb1440
+\viewkind4\uc1
+
+\pard\sa240\qc\b\f0\fs32 SolarEdge Dashboard Solution Design\b0\fs22\par
+\pard\sa120\qc\f0 Version 1.0\par
+\pard\sa240\qc\f0 Date: 2026-05-19\par
+
+\pard\sa220\b\f0\fs24 1. Document Purpose\b0\fs22\par
+\pard\sa140\f0 This document defines the implementation-oriented solution design for evolving the SolarEdge dashboard from direct upstream querying to a persisted data platform backed by a free online database. It complements the architecture specification and focuses on delivery, interfaces, schema, migration, and operational behavior.\par
+
+\pard\sa220\b\f0\fs24 2. Scope\b0\fs22\par
+\pard\sa120\f0 In scope:\par
+\pard\sa120\f0 1. Database-backed persistence for historical energy data.\par
+\pard\sa120\f0 2. Scheduled ingestion from SolarEdge.\par
+\pard\sa120\f0 3. API changes to serve data from persistence.\par
+\pard\sa120\f0 4. Rollup generation for dashboard performance.\par
+\pard\sa120\f0 5. Operational monitoring and stale-data reporting.\par
+\pard\sa120\f0 6. Migration path from current implementation.\par
+\pard\sa120\f0 Out of scope:\par
+\pard\sa120\f0 1. User authentication and multi-tenant administration.\par
+\pard\sa120\f0 2. Native mobile applications.\par
+\pard\sa120\f0 3. Billing, monetization, or enterprise governance features.\par
+
+\pard\sa220\b\f0\fs24 3. Business Goals\b0\fs22\par
+\pard\sa120\f0 1. Reduce page load dependency on SolarEdge availability.\par
+\pard\sa120\f0 2. Preserve historical energy data beyond transient API access.\par
+\pard\sa120\f0 3. Enable faster chart generation for large time ranges.\par
+\pard\sa120\f0 4. Improve operational resilience through retries, audit logs, and backfills.\par
+\pard\sa120\f0 5. Keep infrastructure cost at or near free-tier level.\par
+
+\pard\sa220\b\f0\fs24 4. Recommended Target Stack\b0\fs22\par
+\pard\sa120\f0 1. Frontend: existing static dashboard with Chart.js.\par
+\pard\sa120\f0 2. Backend API: existing Node.js and Express service.\par
+\pard\sa120\f0 3. Database: Supabase PostgreSQL.\par
+\pard\sa120\f0 4. Scheduler: GitHub Actions cron, Supabase scheduled function, or a lightweight hosted cron job.\par
+\pard\sa120\f0 5. Secrets management: environment variables in backend and CI only.\par
+
+\pard\sa220\b\f0\fs24 5. Solution Overview\b0\fs22\par
+\pard\sa120\f1\fs18
++----------------+      +---------------------+      +------------------+\par
+| SolarEdge API  | ---> | Ingestion Service   | ---> | Supabase DB      |\par
+| energyDetails  |      | fetch + retry       |      | raw + rollups    |\par
+| currentPower   |      | upsert + audit      |      | sync_runs        |\par
++----------------+      +----------+----------+      +--------+---------+\par
+                                     |                          |\par
+                                     |                          |\par
+                                     v                          v\par
+                           +---------------------+      +------------------+\par
+                           | Aggregation Service | ---> | Express API      |\par
+                           | query / rollups     |      | /api/energy      |\par
+                           | fallback rules      |      | /api/power/live  |\par
+                           +---------------------+      +--------+---------+\par
+                                                                     |\par
+                                                                     v\par
+                                                           +------------------+\par
+                                                           | Browser Dashboard|\par
+                                                           | charts + filters |\par
+                                                           +------------------+\par
+\pard\sa120\f0\fs22\par
+
+\pard\sa220\b\f0\fs24 6. Core Design Decisions\b0\fs22\par
+\pard\sa120\f0 1. Persist raw upstream samples before relying on pre-aggregated values.\par
+\pard\sa120\f0 2. Use idempotent upsert logic keyed by site, timestamp, and granularity.\par
+\pard\sa120\f0 3. Keep SolarEdge API access server-side only.\par
+\pard\sa120\f0 4. Query raw data for short intervals and rollups for long intervals.\par
+\pard\sa120\f0 5. Keep live power flow as a separate runtime endpoint.\par
+
+\pard\sa220\b\f0\fs24 7. Logical Components and Responsibilities\b0\fs22\par
+\pard\sa120\b\f0 7.1 SolarEdge Client\b0\par
+\pard\sa120\f0 Responsibilities:\par
+\pard\sa120\f0 1. Call SolarEdge endpoints such as energyDetails and currentPowerFlow.\par
+\pard\sa120\f0 2. Handle retries and transient network failures.\par
+\pard\sa120\f0 3. Normalize upstream errors into application-level exceptions.\par
+
+\pard\sa120\b\f0 7.2 Ingestion Service\b0\par
+\pard\sa120\f0 Responsibilities:\par
+\pard\sa120\f0 1. Determine time windows for fetch jobs.\par
+\pard\sa120\f0 2. Retrieve raw SolarEdge samples.\par
+\pard\sa120\f0 3. Upsert samples into the database.\par
+\pard\sa120\f0 4. Record sync run status and metrics.\par
+
+\pard\sa120\b\f0 7.3 Aggregation Service\b0\par
+\pard\sa120\f0 Responsibilities:\par
+\pard\sa120\f0 1. Read raw samples and rollups.\par
+\pard\sa120\f0 2. Select the correct granularity based on the requested interval.\par
+\pard\sa120\f0 3. Compute KPI values for API responses.\par
+\pard\sa120\f0 4. Fall back to direct upstream reads only when necessary.\par
+
+\pard\sa120\b\f0 7.4 Repository Layer\b0\par
+\pard\sa120\f0 Responsibilities:\par
+\pard\sa120\f0 1. Abstract data reads and writes from the rest of the application.\par
+\pard\sa120\f0 2. Encapsulate SQL or database client logic.\par
+\pard\sa120\f0 3. Support unit testing via repository stubs or mocks.\par
+
+\pard\sa120\b\f0 7.5 API Layer\b0\par
+\pard\sa120\f0 Responsibilities:\par
+\pard\sa120\f0 1. Validate request parameters.\par
+\pard\sa120\f0 2. Request summary data from the aggregation service.\par
+\pard\sa120\f0 3. Return stable chart-ready JSON to the frontend.\par
+\pard\sa120\f0 4. Expose health and sync diagnostics.\par
+
+\pard\sa220\b\f0\fs24 8. Proposed Database Schema\b0\fs22\par
+\pard\sa120\b\f0 Table: sites\b0\par
+\pard\sa120\f0 Purpose: store one or more SolarEdge site identities.\par
+\pard\sa120\f1\fs18
+sites (\par
+  id uuid primary key,\par
+  external_site_id text not null unique,\par
+  name text null,\par
+  timezone text not null,\par
+  created_at timestamptz not null default now()\par
+)\par
+\pard\sa120\f0\fs22
+
+\pard\sa120\b\f0 Table: energy_samples\b0\par
+\pard\sa120\f0 Purpose: store raw time-series values.\par
+\pard\sa120\f1\fs18
+energy_samples (\par
+  id uuid primary key,\par
+  site_id uuid not null references sites(id),\par
+  timestamp_utc timestamptz not null,\par
+  granularity text not null,\par
+  production_wh numeric not null default 0,\par
+  consumption_wh numeric not null default 0,\par
+  grid_import_wh numeric not null default 0,\par
+  grid_export_wh numeric not null default 0,\par
+  self_consumed_wh numeric not null default 0,\par
+  source text not null,\par
+  created_at timestamptz not null default now(),\par
+  unique(site_id, timestamp_utc, granularity)\par
+)\par
+\pard\sa120\f0\fs22
+
+\pard\sa120\b\f0 Table: energy_rollups_daily\b0\par
+\pard\sa120\f1\fs18
+energy_rollups_daily (\par
+  id uuid primary key,\par
+  site_id uuid not null references sites(id),\par
+  day_utc date not null,\par
+  production_wh numeric not null default 0,\par
+  consumption_wh numeric not null default 0,\par
+  grid_import_wh numeric not null default 0,\par
+  grid_export_wh numeric not null default 0,\par
+  self_consumed_wh numeric not null default 0,\par
+  updated_at timestamptz not null default now(),\par
+  unique(site_id, day_utc)\par
+)\par
+\pard\sa120\f0\fs22
+
+\pard\sa120\b\f0 Table: energy_rollups_monthly\b0\par
+\pard\sa120\f1\fs18
+energy_rollups_monthly (\par
+  id uuid primary key,\par
+  site_id uuid not null references sites(id),\par
+  month_utc date not null,\par
+  production_wh numeric not null default 0,\par
+  consumption_wh numeric not null default 0,\par
+  grid_import_wh numeric not null default 0,\par
+  grid_export_wh numeric not null default 0,\par
+  self_consumed_wh numeric not null default 0,\par
+  updated_at timestamptz not null default now(),\par
+  unique(site_id, month_utc)\par
+)\par
+\pard\sa120\f0\fs22
+
+\pard\sa120\b\f0 Table: sync_runs\b0\par
+\pard\sa120\f1\fs18
+sync_runs (\par
+  id uuid primary key,\par
+  site_id uuid not null references sites(id),\par
+  sync_type text not null,\par
+  started_at timestamptz not null,\par
+  finished_at timestamptz null,\par
+  status text not null,\par
+  records_written integer not null default 0,\par
+  error_message text null\par
+)\par
+\pard\sa120\f0\fs22
+
+\pard\sa220\b\f0\fs24 9. Data Retention and Query Strategy\b0\fs22\par
+\pard\sa120\f0 1. Retain all raw 15-minute samples for the full project lifetime if volume remains within free-tier limits.\par
+\pard\sa120\f0 2. Use raw samples for intraday views.\par
+\pard\sa120\f0 3. Use daily rollups for weekly and monthly views.\par
+\pard\sa120\f0 4. Use monthly rollups for yearly views.\par
+\pard\sa120\f0 5. Rebuild rollups from raw data when calculation logic changes.\par
+
+\pard\sa220\b\f0\fs24 10. API Design Changes\b0\fs22\par
+\pard\sa120\b\f0 Existing endpoints to retain\b0\par
+\pard\sa120\f0 GET /api/health\par
+\pard\sa120\f0 GET /api/power/live\par
+\pard\sa120\f0 GET /api/energy?start=YYYY-MM-DD&end=YYYY-MM-DD\par
+
+\pard\sa120\b\f0 New endpoints proposed\b0\par
+\pard\sa120\f0 GET /api/sync/status\par
+\pard\sa120\f0 POST /api/sync/run (protected, optional)\par
+\pard\sa120\f0 GET /api/diagnostics/staleness (optional)\par
+
+\pard\sa120\b\f0 API response principle\b0\par
+\pard\sa120\f0 The frontend should continue receiving chart-ready payloads. Internal storage details must remain hidden behind the API.\par
+
+\pard\sa220\b\f0\fs24 11. Internal Interface Design\b0\fs22\par
+\pard\sa120\f1\fs18
+EnergyRepository\par
+  - upsertSamples(samples)\par
+  - getSamples(siteId, start, end, granularity)\par
+  - getDailyRollups(siteId, start, end)\par
+  - getMonthlyRollups(siteId, start, end)\par
+  - saveSyncRun(syncRun)\par
+  - updateSyncRun(syncRun)\par
+\par
+IngestionService\par
+  - syncRecent(siteId)\par
+  - syncRange(siteId, start, end, granularity)\par
+  - backfillDay(siteId, day)\par
+\par
+AggregationService\par
+  - getEnergySummary(siteId, start, end)\par
+  - selectGranularity(start, end)\par
+  - buildKpis(points)\par
+\pard\sa120\f0\fs22
+
+\pard\sa220\b\f0\fs24 12. Scheduling Design\b0\fs22\par
+\pard\sa120\f0 Recommended schedule:\par
+\pard\sa120\f0 1. Every 15 minutes: fetch current day intraday updates.\par
+\pard\sa120\f0 2. Every night: backfill the previous day in case SolarEdge publishes late corrections.\par
+\pard\sa120\f0 3. Every week: run a gap detection job and rebuild any missing ranges.\par
+
+\pard\sa120\b\f0 Suggested GitHub Actions model\b0\par
+\pard\sa120\f0 1. Workflow uses encrypted repository secrets.\par
+\pard\sa120\f0 2. Workflow runs a sync script.\par
+\pard\sa120\f0 3. Workflow writes audit result to sync_runs through the backend or direct DB client.\par
+
+\pard\sa220\b\f0\fs24 13. Environment Configuration\b0\fs22\par
+\pard\sa120\f0 Required runtime configuration:\par
+\pard\sa120\f0 1. SOLAREDGE_API_KEY\par
+\pard\sa120\f0 2. SOLAREDGE_SITE_ID\par
+\pard\sa120\f0 3. DATABASE_URL or Supabase connection settings\par
+\pard\sa120\f0 4. Optional sync token for protected administrative endpoints\par
+
+\pard\sa220\b\f0\fs24 14. Implementation Phases\b0\fs22\par
+\pard\sa120\b\f0 Phase 1: Persistence Foundation\b0\par
+\pard\sa120\f0 Deliverables:\par
+\pard\sa120\f0 1. Add repository abstraction.\par
+\pard\sa120\f0 2. Introduce Supabase client configuration.\par
+\pard\sa120\f0 3. Create tables and indexes.\par
+\pard\sa120\f0 Exit criteria: database schema exists and repository integration tests pass.\par
+
+\pard\sa120\b\f0 Phase 2: Raw Ingestion\b0\par
+\pard\sa120\f0 Deliverables:\par
+\pard\sa120\f0 1. Implement sync command for a date range.\par
+\pard\sa120\f0 2. Implement idempotent upsert behavior.\par
+\pard\sa120\f0 3. Write sync_runs audit records.\par
+\pard\sa120\f0 Exit criteria: a day of data can be synced and re-synced without duplication.\par
+
+\pard\sa120\b\f0 Phase 3: Database-backed API\b0\par
+\pard\sa120\f0 Deliverables:\par
+\pard\sa120\f0 1. Change /api/energy to read from the database.\par
+\pard\sa120\f0 2. Preserve current API response shape for the frontend.\par
+\pard\sa120\f0 3. Add stale-data logic and fallback behavior if required.\par
+\pard\sa120\f0 Exit criteria: the UI functions without direct historical reads from SolarEdge.\par
+
+\pard\sa120\b\f0 Phase 4: Rollups and Performance\b0\par
+\pard\sa120\f0 Deliverables:\par
+\pard\sa120\f0 1. Daily rollup generation.\par
+\pard\sa120\f0 2. Monthly rollup generation.\par
+\pard\sa120\f0 3. Query planner logic for interval-based reads.\par
+\pard\sa120\f0 Exit criteria: long-range dashboard loads stay fast and stable.\par
+
+\pard\sa120\b\f0 Phase 5: Operations and Monitoring\b0\par
+\pard\sa120\f0 Deliverables:\par
+\pard\sa120\f0 1. Scheduled sync workflows.\par
+\pard\sa120\f0 2. Sync status endpoint or admin page.\par
+\pard\sa120\f0 3. Alerting or visible stale-data signal.\par
+\pard\sa120\f0 Exit criteria: operators can tell whether data is healthy and current.\par
+
+\pard\sa220\b\f0\fs24 15. Risks and Mitigations\b0\fs22\par
+\pard\sa120\f0 Risk: SolarEdge throttling or intermittent network resets.\par
+\pard\sa120\f0 Mitigation: retry policy, backoff, scheduled backfill, and sync audit logs.\par
+
+\pard\sa120\f0 Risk: free-tier database sleeping or quota constraints.\par
+\pard\sa120\f0 Mitigation: use rollups, limit excessive polling, and keep the API query pattern efficient.\par
+
+\pard\sa120\f0 Risk: timestamp misalignment or timezone drift.\par
+\pard\sa120\f0 Mitigation: store UTC timestamps only and convert at presentation boundaries.\par
+
+\pard\sa120\f0 Risk: inconsistent calculations after logic changes.\par
+\pard\sa120\f0 Mitigation: preserve raw samples and rebuild rollups deterministically.\par
+
+\pard\sa220\b\f0\fs24 16. Testing Strategy\b0\fs22\par
+\pard\sa120\f0 1. Unit tests for repository query selection and KPI calculations.\par
+\pard\sa120\f0 2. Unit tests for idempotent upsert behavior.\par
+\pard\sa120\f0 3. Integration tests for syncing a known date range into the database.\par
+\pard\sa120\f0 4. API regression tests preserving current response contracts.\par
+\pard\sa120\f0 5. Scheduled-job smoke tests in a non-production environment.\par
+
+\pard\sa220\b\f0\fs24 17. Acceptance Criteria\b0\fs22\par
+\pard\sa120\f0 1. Historical chart requests are served from the database for normal operation.\par
+\pard\sa120\f0 2. Raw sync jobs can run repeatedly without duplicate records.\par
+\pard\sa120\f0 3. Daily and monthly chart ranges load within acceptable time on the free tier.\par
+\pard\sa120\f0 4. Sync status and failures are visible through logs or an API endpoint.\par
+\pard\sa120\f0 5. The browser never receives the SolarEdge API key.\par
+
+\pard\sa220\b\f0\fs24 18. Recommended First Sprint\b0\fs22\par
+\pard\sa120\f0 Sprint objective: create the persistence backbone without changing the frontend contract.\par
+\pard\sa120\f0 Scope:\par
+\pard\sa120\f0 1. Add repository abstraction.\par
+\pard\sa120\f0 2. Create Supabase schema.\par
+\pard\sa120\f0 3. Implement manual range sync command.\par
+\pard\sa120\f0 4. Store one day of real data successfully.\par
+\pard\sa120\f0 5. Read that same day through the API from the database.\par
+
+\pard\sa220\b\f0\fs24 19. Final Design Recommendation\b0\fs22\par
+\pard\sa140\f0 Implement the solution in phases, beginning with raw sample persistence and repository abstraction. Do not start with complex rollups or admin tooling before the database-backed ingestion path is stable. The preferred outcome is a Supabase-backed service that preserves raw SolarEdge data, serves chart-ready API responses efficiently, and supports reliable scheduled synchronization on a free tier.\par
+
+\pard\sa200\qc\i\f0 End of solution design\i0\par
+}

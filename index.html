@@ -1,0 +1,95 @@
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SolarEdge Energy Dashboard</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <header class="page-header">
+        <p class="eyebrow">Solar Analytics</p>
+        <h1>Home Energy and Self-Consumption</h1>
+        <p class="subtitle">Track day, week, month, and year performance from SolarEdge data.</p>
+    </header>
+
+    <main class="page-main">
+        <section class="control-panel" aria-label="Chart controls">
+            <article class="date-selector">
+                <label for="start-date">Start date</label>
+                <input type="date" id="start-date" name="startDate">
+                <label for="end-date">End date</label>
+                <input type="date" id="end-date" name="endDate">
+            </article>
+
+            <article class="view-toggle" aria-label="Chart view mode">
+                <span class="view-toggle-label">Chart view</span>
+                <div class="view-toggle-actions">
+                    <button type="button" id="view-mode-positive" class="range-btn view-mode-btn is-active" data-view-mode="positive" aria-pressed="true">All Positive</button>
+                    <button type="button" id="view-mode-split" class="range-btn view-mode-btn" data-view-mode="split" aria-pressed="false">Positive / Negative</button>
+                </div>
+            </article>
+
+            <button type="button" id="refresh-btn" class="refresh-btn">Refresh</button>
+        </section>
+
+        <section class="kpi-grid" aria-label="Energy key performance indicators">
+            <article class="kpi-card">
+                <h2>Consumption</h2>
+                <p id="kpi-consumption" class="kpi-value">-</p>
+            </article>
+            <article class="kpi-card">
+                <h2>Production</h2>
+                <p id="kpi-production" class="kpi-value">-</p>
+            </article>
+            <article class="kpi-card">
+                <h2>Self-Consumption</h2>
+                <p id="kpi-self-consumption" class="kpi-value">-</p>
+            </article>
+            <article class="kpi-card">
+                <h2>Self-Consumption Rate</h2>
+                <p id="kpi-self-rate" class="kpi-value">-</p>
+                <div class="rate-meter" role="img" aria-label="Self-consumption rate indicator">
+                    <span id="kpi-self-rate-fill" class="rate-meter-fill"></span>
+                </div>
+                <p id="kpi-self-rate-label" class="kpi-subtext">-</p>
+            </article>
+        </section>
+
+        <section class="chart-panel" aria-labelledby="energy-chart-title">
+            <div class="chart-header">
+                <h2 id="energy-chart-title">Energy by interval</h2>
+                <p id="chart-meta"></p>
+            </div>
+            <canvas id="energy-chart" aria-label="Energy chart" role="img"></canvas>
+            <div id="daily-charts" class="daily-charts" aria-label="Daily energy charts" hidden></div>
+        </section>
+
+        <section class="live-panel" aria-labelledby="live-power-title">
+            <h2 id="live-power-title">Live Power Flow</h2>
+            <dl class="live-grid">
+                <div>
+                    <dt>PV</dt>
+                    <dd id="live-pv">-</dd>
+                </div>
+                <div>
+                    <dt>Load</dt>
+                    <dd id="live-load">-</dd>
+                </div>
+                <div>
+                    <dt>Grid</dt>
+                    <dd id="live-grid">-</dd>
+                </div>
+            </dl>
+        </section>
+
+        <p id="error-banner" class="error-banner" hidden></p>
+    </main>
+
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.5.0/dist/chart.umd.min.js"></script>
+    <script src="script.js" type="module"></script>
+</body>
+</html>

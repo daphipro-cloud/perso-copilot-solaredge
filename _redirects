@@ -1,0 +1,2 @@
+# Replace https://your-api.onrender.com with your Render API URL
+/api/*  https://your-api.onrender.com/api/:splat  200

@@ -1,0 +1,200 @@
+{\rtf1\ansi\deff0
+{\fonttbl
+{\f0 Arial;}
+{\f1 Courier New;}
+}
+\paperw11907\paperh16840\margl1440\margr1440\margt1440\margb1440
+\viewkind4\uc1
+
+\pard\sa240\qc\b\f0\fs32 SolarEdge Dashboard Architecture Specification\b0\fs22\par
+\pard\sa120\qc\f0 Version 1.0\par
+\pard\sa240\qc\f0 Date: 2026-05-19\par
+
+\pard\sa220\b\f0\fs24 1. Purpose\b0\fs22\par
+\pard\sa140\f0 This document defines a target software architecture for the SolarEdge dashboard so historical energy data can be stored in a free online database, reused by the web application, and queried efficiently without depending on a live SolarEdge API call for every page load.\par
+
+\pard\sa220\b\f0\fs24 2. Objectives\b0\fs22\par
+\pard\sa120\f0 1. Persist energy history online at low or zero cost.\par
+\pard\sa120\f0 2. Keep the SolarEdge API key server-side only.\par
+\pard\sa120\f0 3. Support intraday, daily, weekly, monthly, and yearly charts.\par
+\pard\sa120\f0 4. Reduce dependency on SolarEdge availability during dashboard browsing.\par
+\pard\sa120\f0 5. Support future analytics such as self-consumption, import/export, and rollups.\par
+
+\pard\sa220\b\f0\fs24 3. Current Application Context\b0\fs22\par
+\pard\sa120\f0 The current application is a Node.js and Express web application that retrieves SolarEdge data, aggregates it on the server, and renders charts in the browser. It currently includes a frontend dashboard, an Express API layer, SolarEdge client code, and chart rendering logic.\par
+
+\pard\sa220\b\f0\fs24 4. Architectural Principle\b0\fs22\par
+\pard\sa140\f0 The system should move from a request-time integration model to a persisted data model:\par
+
+\pard\sa120\qc\b\f0 SolarEdge API -> Ingestion Job -> Online Database -> API Layer -> Dashboard UI\b0\par
+
+\pard\sa220\b\f0\fs24 5. Candidate Storage Proposals\b0\fs22\par
+\pard\sa120\b\f0 Proposal A: Supabase (Recommended)\b0\par
+\pard\sa120\f0 Free PostgreSQL-based platform. Best fit for time-series storage, SQL aggregations, rollups, and long-term growth. Good balance between cost, flexibility, and maintainability.\par
+
+\pard\sa120\b\f0 Proposal B: Turso / libSQL\b0\par
+\pard\sa120\f0 Lightweight cloud SQLite approach. Simpler than PostgreSQL and suitable for a personal dashboard. Good option if minimal operational overhead is preferred.\par
+
+\pard\sa120\b\f0 Proposal C: Firebase Firestore\b0\par
+\pard\sa120\f0 Managed and free-tier friendly, but less natural for time-series analytics and aggregated reporting. Better for app-platform use cases than analytical dashboards.\par
+
+\pard\sa120\b\f0 Proposal D: GitHub Actions + JSON Snapshots\b0\par
+\pard\sa120\f0 Lowest-cost alternative. Scheduled jobs generate data snapshots stored in files. Acceptable for static reporting, but weaker for querying arbitrary intervals and long-term evolution.\par
+
+\pard\sa220\b\f0\fs24 6. Recommended Target Architecture\b0\fs22\par
+\pard\sa120\f0 Recommended platform: Supabase.\par
+\pard\sa120\f0 Recommended system shape:\par
+\pard\sa120\f0 1. Frontend dashboard remains static and browser-based.\par
+\pard\sa120\f0 2. Node.js API remains the only backend entry point for the UI.\par
+\pard\sa120\f0 3. A scheduled ingestion service fetches SolarEdge energy data at regular intervals.\par
+\pard\sa120\f0 4. Raw samples are stored in a database table.\par
+\pard\sa120\f0 5. Daily and monthly rollups are computed from raw samples.\par
+\pard\sa120\f0 6. The dashboard reads primarily from the database, not directly from SolarEdge.\par
+\pard\sa120\f0 7. Live power flow may still be requested from SolarEdge at runtime for near-real-time values.\par
+
+\pard\sa220\b\f0\fs24 7. Application and Data Flow Diagram\b0\fs22\par
+\pard\sa120\f1\fs18
++--------------------+       HTTPS       +--------------------+\par
+|   Browser UI       | <--------------> |  Node / Express    |\par
+| index.html         |                  |  API Layer         |\par
+| script.js          |                  | /api/energy        |\par
+| Chart.js           |                  | /api/power/live    |\par
++---------+----------+                  +-----+--------------+\par
+          ^                                       |\par
+          |                                       | read mostly\par
+          |                                       v\par
+          |                            +-----------------------+\par
+          |                            |  Online Database      |\par
+          |                            |  raw samples          |\par
+          |                            |  daily rollups        |\par
+          |                            |  monthly rollups      |\par
+          |                            |  sync runs            |\par
+          |                            +-----------+-----------+\par
+          |                                        ^\par
+          |                                        | upsert\par
+          |                                        |\par
+          |                            +-----------+-----------+\par
+          |                            |  Ingestion Scheduler   |\par
+          |                            |  cron / action / job   |\par
+          |                            +-----------+-----------+\par
+          |                                        |\par
+          |                                        | fetch\par
+          |                                        v\par
+          |                            +-----------------------+\par
+          +--------------------------- |  SolarEdge API        |\par
+                                       | energyDetails         |\par
+                                       | energy                |\par
+                                       | currentPowerFlow      |\par
+                                       +-----------------------+\par
+\pard\sa120\f0\fs22\par
+
+\pard\sa220\b\f0\fs24 8. Logical Components\b0\fs22\par
+\pard\sa120\f0 1. Dashboard UI\par
+\pard\sa120\f0 Responsible for controls, chart mode, and visualization only. It must not know the SolarEdge API key.\par
+
+\pard\sa120\f0 2. API Layer\par
+\pard\sa120\f0 Responsible for serving chart-ready data to the browser, reading from the persistence layer, and optionally falling back to live SolarEdge queries when recent data is missing.\par
+
+\pard\sa120\f0 3. Ingestion Service\par
+\pard\sa120\f0 Responsible for fetching new SolarEdge data periodically, handling retries, and performing idempotent upserts into the database.\par
+
+\pard\sa120\f0 4. Aggregation Service\par
+\pard\sa120\f0 Responsible for producing daily, weekly, monthly, and yearly summaries either on demand or through precomputed rollups.\par
+
+\pard\sa120\f0 5. Persistence Layer\par
+\pard\sa120\f0 Responsible for storing raw samples, rollups, sync audit records, and metadata for sites.\par
+
+\pard\sa220\b\f0\fs24 9. Proposed Data Model\b0\fs22\par
+\pard\sa120\b\f0 Table: sites\b0\par
+\pard\sa120\f0 Stores site identity and metadata.\par
+\pard\sa120\f0 Fields: id, external_site_id, name, timezone, created_at.\par
+
+\pard\sa120\b\f0 Table: energy_samples\b0\par
+\pard\sa120\f0 Stores raw 15-minute, hourly, or daily measurements.\par
+\pard\sa120\f0 Fields: id, site_id, timestamp_utc, granularity, production_wh, consumption_wh, grid_import_wh, grid_export_wh, self_consumed_wh, source, created_at.\par
+
+\pard\sa120\b\f0 Table: energy_rollups_daily\b0\par
+\pard\sa120\f0 Stores pre-aggregated daily totals for fast reporting.\par
+\pard\sa120\f0 Fields: id, site_id, day_utc, production_wh, consumption_wh, grid_import_wh, grid_export_wh, self_consumed_wh, updated_at.\par
+
+\pard\sa120\b\f0 Table: energy_rollups_monthly\b0\par
+\pard\sa120\f0 Stores monthly totals for long-range dashboard queries.\par
+\pard\sa120\f0 Fields: id, site_id, month_utc, production_wh, consumption_wh, grid_import_wh, grid_export_wh, self_consumed_wh, updated_at.\par
+
+\pard\sa120\b\f0 Table: sync_runs\b0\par
+\pard\sa120\f0 Stores ingestion status and audit history.\par
+\pard\sa120\f0 Fields: id, site_id, sync_type, started_at, finished_at, status, records_written, error_message.\par
+
+\pard\sa220\b\f0\fs24 10. Data Relationship Diagram\b0\fs22\par
+\pard\sa120\f1\fs18
++-------------+         1 ---- n         +------------------+\par
+|   sites     |--------------------------|  energy_samples  |\par
+| id          |                          | id               |\par
+| external_id |                          | site_id          |\par
+| timezone    |                          | timestamp_utc    |\par
++------+------+                          | granularity      |\par
+       |                                 | production_wh    |\par
+       |                                 | consumption_wh   |\par
+       |                                 | grid_import_wh   |\par
+       |                                 | grid_export_wh   |\par
+       |                                 | self_consumed_wh |\par
+       |                                 +------------------+\par
+       |\par
+       |         1 ---- n         +------------------------+\par
+       +--------------------------|  energy_rollups_daily  |\par
+       |                          | site_id                |\par
+       |                          | day_utc                |\par
+       |                          | aggregated values      |\par
+       |                          +------------------------+\par
+       |\par
+       |         1 ---- n         +--------------------------+\par
+       +--------------------------| energy_rollups_monthly   |\par
+       |                          | site_id                  |\par
+       |                          | month_utc                |\par
+       |                          | aggregated values        |\par
+       |                          +--------------------------+\par
+       |\par
+       |         1 ---- n         +------------------+\par
+       +--------------------------|    sync_runs     |\par
+                                  | site_id          |\par
+                                  | started_at       |\par
+                                  | finished_at      |\par
+                                  | status           |\par
+                                  +------------------+\par
+\pard\sa120\f0\fs22\par
+
+\pard\sa220\b\f0\fs24 11. Recommended Access Pattern\b0\fs22\par
+\pard\sa120\f0 1. Intraday chart queries use raw 15-minute samples.\par
+\pard\sa120\f0 2. Weekly and monthly chart queries can use daily rollups.\par
+\pard\sa120\f0 3. Yearly chart queries use monthly rollups.\par
+\pard\sa120\f0 4. Live power flow remains a separate direct query if real-time freshness is required.\par
+
+\pard\sa220\b\f0\fs24 12. Scheduling Strategy\b0\fs22\par
+\pard\sa120\f0 1. Near-real-time sync every 15 minutes or every hour.\par
+\pard\sa120\f0 2. Nightly backfill for the previous day to capture late corrections.\par
+\pard\sa120\f0 3. Weekly integrity check to detect missing samples or failed runs.\par
+
+\pard\sa220\b\f0\fs24 13. Reliability and Security Requirements\b0\fs22\par
+\pard\sa120\f0 1. SolarEdge API key must remain server-side only.\par
+\pard\sa120\f0 2. All timestamps must be stored in UTC.\par
+\pard\sa120\f0 3. Raw sample ingestion must be idempotent.\par
+\pard\sa120\f0 4. Unique key should be enforced on site_id, timestamp_utc, and granularity.\par
+\pard\sa120\f0 5. Failed sync runs must be recorded for diagnosis.\par
+\pard\sa120\f0 6. The dashboard should indicate stale data if the latest sync is too old.\par
+
+\pard\sa220\b\f0\fs24 14. Migration Path From Current Project\b0\fs22\par
+\pard\sa120\f0 Phase 1: Introduce a repository abstraction for energy reads and writes.\par
+\pard\sa120\f0 Phase 2: Add an online database and create the raw sample and sync tables.\par
+\pard\sa120\f0 Phase 3: Build an ingestion command and schedule it.\par
+\pard\sa120\f0 Phase 4: Change the API to read from the database first.\par
+\pard\sa120\f0 Phase 5: Add daily and monthly rollups for performance.\par
+\pard\sa120\f0 Phase 6: Add monitoring, stale-data detection, and admin diagnostics.\par
+
+\pard\sa220\b\f0\fs24 15. Final Recommendation\b0\fs22\par
+\pard\sa140\f0 The recommended architecture is Supabase plus scheduled ingestion, raw sample persistence, and rollup tables. This architecture preserves free-tier viability while giving the application a scalable and maintainable base for charting, reporting, caching, and future analytics.\par
+
+\pard\sa220\b\f0\fs24 16. Summary\b0\fs22\par
+\pard\sa120\f0 The software should evolve from direct API-driven rendering to a persisted data platform. SolarEdge becomes the upstream source of truth, the database becomes the operational data store, the Node API becomes the controlled access layer, and the dashboard becomes a fast consumer of prepared data.\par
+
+\pard\sa200\qc\i\f0 End of specification\i0\par
+}
