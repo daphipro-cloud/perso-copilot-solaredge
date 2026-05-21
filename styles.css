@@ -80,7 +80,6 @@ h1 {
     gap: 0.8rem;
 }
 
-.control-panel,
 .chart-panel,
 .live-panel,
 .kpi-card {
@@ -89,15 +88,6 @@ h1 {
     border-radius: 18px;
     box-shadow: var(--shadow);
     backdrop-filter: blur(5px);
-}
-
-.control-panel {
-    padding: 0.85rem 1rem;
-    display: flex;
-    flex-wrap: wrap;
-    align-items: end;
-    gap: 0.75rem;
-    justify-content: space-between;
 }
 
 .range-switch {
@@ -360,6 +350,11 @@ h1 {
     font-size: 0.78rem;
 }
 
+.chart-header .chart-refresh-btn {
+    padding: 0.38rem 0.7rem;
+    font-size: 0.78rem;
+}
+
 #chart-meta {
     margin: 0;
     color: var(--text-muted);
@@ -493,18 +488,13 @@ h1 {
         height: 100%;
         padding-bottom: 0.8rem;
         grid-template-columns: minmax(0, 2.35fr) minmax(240px, 0.95fr);
-        grid-template-rows: auto auto minmax(0, 1fr) auto;
+        grid-template-rows: auto minmax(0, 1fr) auto;
         grid-template-areas:
-            "control control"
             "kpis kpis"
             "chart live"
             "error error";
         align-items: stretch;
         overflow: hidden;
-    }
-
-    .control-panel {
-        grid-area: control;
     }
 
     .kpi-grid {
@@ -584,6 +574,10 @@ h1 {
         justify-content: center;
     }
 
+    .chart-header .chart-refresh-btn {
+        margin: 0 auto;
+    }
+
     .daily-chart-item {
         flex-basis: 46%;
         min-width: 210px;
@@ -629,20 +623,11 @@ h1 {
         gap: 0.55rem;
     }
 
-    .control-panel,
     .kpi-card,
     .chart-panel,
     .live-panel {
         padding: 0.55rem 0.65rem;
         border-radius: 14px;
-    }
-
-    .control-panel {
-        display: grid;
-        grid-template-columns: minmax(0, 1fr) auto;
-        align-items: center;
-        gap: 0.35rem 0.45rem;
-        padding: 0.45rem 0.6rem;
     }
 
     .chart-date-selector {

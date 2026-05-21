@@ -17,10 +17,6 @@
     </header>
 
     <main class="page-main">
-        <section class="control-panel" aria-label="Chart controls">
-            <button type="button" id="refresh-btn" class="refresh-btn">Refresh</button>
-        </section>
-
         <section class="kpi-grid" aria-label="Energy key performance indicators">
             <article class="kpi-card">
                 <h2>Consumption</h2>
@@ -55,6 +51,7 @@
                         <button type="button" id="view-mode-split" class="range-btn view-mode-btn" data-view-mode="split" aria-pressed="false">Positive / Negative</button>
                     </div>
                 </article>
+                <button type="button" id="refresh-btn" class="refresh-btn chart-refresh-btn">Refresh</button>
                 <p id="chart-meta"></p>
             </div>
             <canvas id="energy-chart" aria-label="Energy chart" role="img"></canvas>
