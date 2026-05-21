@@ -18,17 +18,6 @@
 
     <main class="page-main">
         <section class="control-panel" aria-label="Chart controls">
-            <article class="date-selector">
-                <label for="start-date">Start date</label>
-                <input type="date" id="start-date" name="startDate">
-                <label for="end-date">End date</label>
-                <input type="date" id="end-date" name="endDate">
-                <div class="date-nav-actions" aria-label="Move date window by one day">
-                    <button type="button" id="prev-day-btn" class="range-btn day-nav-btn" aria-label="Move to previous day">&lt;</button>
-                    <button type="button" id="next-day-btn" class="range-btn day-nav-btn" aria-label="Move to next day">&gt;</button>
-                </div>
-            </article>
-
             <article class="view-toggle" aria-label="Chart view mode">
                 <span class="view-toggle-label">Chart view</span>
                 <div class="view-toggle-actions">
@@ -73,6 +62,15 @@
         <section class="chart-panel" aria-labelledby="energy-chart-title">
             <div class="chart-header">
                 <h2 id="energy-chart-title">Energy by interval</h2>
+                <article class="date-selector chart-date-selector" aria-label="Date range selector">
+                    <label for="start-date" class="sr-only">Start date</label>
+                    <button type="button" id="prev-day-btn" class="range-btn day-nav-btn" aria-label="Move to previous day">&lt;</button>
+                    <input type="date" id="start-date" name="startDate">
+                    <span class="date-separator">to</span>
+                    <label for="end-date" class="sr-only">End date</label>
+                    <input type="date" id="end-date" name="endDate">
+                    <button type="button" id="next-day-btn" class="range-btn day-nav-btn" aria-label="Move to next day">&gt;</button>
+                </article>
                 <p id="chart-meta"></p>
             </div>
             <canvas id="energy-chart" aria-label="Energy chart" role="img"></canvas>
