@@ -1,10 +1,9 @@
-# Production Go-Live Checklist (Render + Netlify)
+# Production Go-Live Checklist (Supabase + Render)
 
 This is a strict single-path runbook for always-on production:
 1. Supabase for data storage.
 2. GitHub Actions for scheduled sync.
 3. Render for API hosting.
-4. Netlify for frontend hosting.
 
 ## 1. Prerequisites
 
@@ -60,14 +59,11 @@ In GitHub repository Settings > Secrets and variables > Actions, create:
 4. SUPABASE_SERVICE_ROLE_KEY
 6. Deploy and copy the Render service URL (example: https://your-api.onrender.com).
 
-## 7. Deploy Frontend on Netlify
+## 7. Optional Frontend Hosting
 
-1. Create a new Netlify site from this GitHub repo.
-2. Build command: leave empty (static app).
-3. Publish directory: .
-4. Add Netlify redirect file [../_redirects](../_redirects) if you want same-domain API proxy:
-1. /api/*  https://your-api.onrender.com/api/:splat  200
-5. Deploy site.
+This runbook does not require frontend hosting for backend go-live.
+
+If you later host the UI separately, configure it to call your Render API URL.
 
 ## 8. Production Validation
 
@@ -100,9 +96,11 @@ Expected:
 2. If scheduler fails, run workflow manually and inspect sync_runs/error_message.
 3. If Supabase is unavailable, /api/energy fallback path should still use SolarEdge.
 
-## 11. Done Criteria
+## 11. Done Criteria (Supabase + Render Only)
 
-1. Dashboard is reachable from phone/browser without local machine running.
-2. Scheduled sync runs without manual intervention.
-3. /api/health shows cloud configured and recent sync success.
-4. /api/energy shows source as supabase in normal operation.
+1. Scheduled sync runs without manual intervention.
+2. At least one cron-triggered run (not only manual run) is successful.
+3. /api/health returns cloudStoreConfigured as true.
+4. /api/health returns lastSyncStatus.status as success.
+5. /api/energy returns source as supabase for recent dates.
+6. Supabase tables energy_intervals and sync_runs show recent writes after scheduler runs.
