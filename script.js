@@ -25,6 +25,14 @@ let chartViewMode = "positive";
 let currentEnergyPayload = null;
 const lineChartTimeUnits = new Set(["HOUR", "QUARTER_OF_AN_HOUR"]);
 
+const syncViewportHeight = () => {
+    document.documentElement.style.setProperty("--app-vh", `${window.innerHeight * 0.01}px`);
+};
+
+syncViewportHeight();
+window.addEventListener("resize", syncViewportHeight, { passive: true });
+window.addEventListener("orientationchange", syncViewportHeight, { passive: true });
+
 // Set default dates: today for both
 const today = new Date();
 startDateInput.valueAsDate = today;
