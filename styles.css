@@ -447,6 +447,66 @@ h1 {
     }
 }
 
+@media (orientation: landscape) and (max-height: 500px) {
+    .page-header {
+        padding: 0.55rem 0.8rem 0.35rem;
+    }
+
+    h1 {
+        margin: 0.15rem 0;
+        font-size: clamp(1.05rem, 2.6vw, 1.45rem);
+    }
+
+    .subtitle {
+        font-size: 0.84rem;
+    }
+
+    .page-main {
+        padding: 0 0.8rem 0.6rem;
+        gap: 0.55rem;
+    }
+
+    .control-panel,
+    .kpi-card,
+    .chart-panel,
+    .live-panel {
+        padding: 0.55rem 0.65rem;
+        border-radius: 14px;
+    }
+
+    .kpi-grid {
+        grid-template-columns: repeat(4, minmax(0, 1fr));
+        gap: 0.45rem;
+    }
+
+    .kpi-card h2 {
+        font-size: 0.78rem;
+    }
+
+    .kpi-value {
+        margin-top: 0.2rem;
+        font-size: clamp(0.95rem, 1.55vw, 1.1rem);
+    }
+
+    .kpi-subtext {
+        font-size: 0.72rem;
+    }
+
+    #energy-chart {
+        height: clamp(130px, 34vh, 185px);
+        max-height: 38svh;
+    }
+
+    .live-grid {
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+        gap: 0.42rem;
+    }
+
+    .live-grid div {
+        padding: 0.45rem 0.55rem;
+    }
+}
+
 .sr-only {
     position: absolute;
     width: 1px;
