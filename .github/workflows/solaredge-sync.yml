@@ -25,6 +25,27 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
+      - name: Validate required secrets
+        shell: bash
+        env:
+          SOLAREDGE_API_KEY: ${{ secrets.SOLAREDGE_API_KEY }}
+          SOLAREDGE_SITE_ID: ${{ secrets.SOLAREDGE_SITE_ID }}
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+        run: |
+          missing=()
+
+          [[ -z "$SOLAREDGE_API_KEY" ]] && missing+=("SOLAREDGE_API_KEY")
+          [[ -z "$SOLAREDGE_SITE_ID" ]] && missing+=("SOLAREDGE_SITE_ID")
+          [[ -z "$SUPABASE_URL" ]] && missing+=("SUPABASE_URL")
+          [[ -z "$SUPABASE_SERVICE_ROLE_KEY" ]] && missing+=("SUPABASE_SERVICE_ROLE_KEY")
+
+          if [[ ${#missing[@]} -gt 0 ]]; then
+            echo "::error::Missing GitHub Actions secrets: ${missing[*]}"
+            echo "Set them in Settings > Secrets and variables > Actions > Repository secrets."
+            exit 1
+          fi
+
       - name: Run cloud sync
         run: npm run sync:cloud
         env:
