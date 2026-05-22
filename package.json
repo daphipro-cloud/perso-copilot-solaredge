@@ -8,7 +8,7 @@
     "dev": "node scripts/dev-server.mjs",
     "sync": "node server/sync.js",
     "sync:cloud": "node scripts/cloud-sync.mjs",
-    "test:unit": "node tests/energyRequest.test.js",
+    "test:unit": "node tests/energyRequest.test.js && node tests/powerDetailsParityCsv.test.js",
     "test:solaredge": "node scripts/verify-solaredge.js"
   },
   "dependencies": {
