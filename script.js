@@ -610,6 +610,28 @@ const buildPowerDatasets = (points) => [
     }),
 ];
 
+const toPowerPointsFromEnergy = (energyPoints, timeUnit) => {
+    const multiplier = timeUnit === "QUARTER_OF_AN_HOUR" ? 4 : 1;
+
+    return energyPoints.map((point) => {
+        const productionKw = Number(((point.productionKwh ?? 0) * multiplier).toFixed(4));
+        const consumptionKw = Number(((point.consumptionKwh ?? 0) * multiplier).toFixed(4));
+        const fromPvKw = Number(((point.selfConsumptionKwh ?? 0) * multiplier).toFixed(4));
+        const fromGridKw = Number(((point.importKwh ?? 0) * multiplier).toFixed(4));
+        const toGridKw = Number(((point.exportKwh ?? 0) * multiplier).toFixed(4));
+
+        return {
+            label: point.label,
+            productionKw,
+            toBuildingKw: fromPvKw,
+            toGridKw,
+            consumptionKw,
+            fromPvKw,
+            fromGridKw,
+        };
+    });
+};
+
 const buildChartOptions = ({
     rawLabels,
     showLineChart,
@@ -788,7 +810,7 @@ const renderChart = (energyPoints, meta, powerPoints = null) => {
     });
 };
 
-const buildChartMetaText = (meta, hasParityPower = false) => {
+const buildChartMetaText = (meta, powerMode = null) => {
     let text = `${meta.start} to ${meta.end}`;
 
     if (isSingleDayRange(meta.start, meta.end)) {
@@ -803,8 +825,10 @@ const buildChartMetaText = (meta, hasParityPower = false) => {
         ? " • split +/-"
         : " • all positive";
 
-    if (hasParityPower) {
+    if (powerMode === "parity") {
         text += " • parity mode (kW)";
+    } else if (powerMode === "derived") {
+        text += " • derived mode (kW)";
     }
 
     return text;
@@ -838,7 +862,8 @@ const refreshDashboard = async () => {
         }
 
         const energyPayload = energyResult.value;
-        let parityPoints = null;
+        let powerPoints = null;
+        let powerMode = null;
 
         if (lineChartTimeUnits.has(energyPayload?.meta?.timeUnit ?? "DAY")) {
             try {
@@ -846,18 +871,21 @@ const refreshDashboard = async () => {
                     `/api/power/intervals?start=${encodeURIComponent(start)}&end=${encodeURIComponent(end)}&timeUnit=${encodeURIComponent(energyPayload.meta.timeUnit)}`,
                 );
 
-                parityPoints = Array.isArray(parityPayload?.points) ? parityPayload.points : null;
+                powerPoints = Array.isArray(parityPayload?.points) ? parityPayload.points : null;
+                powerMode = powerPoints && powerPoints.length > 0 ? "parity" : null;
             } catch {
-                // Keep energy chart fallback when parity rows are unavailable.
+                powerPoints = toPowerPointsFromEnergy(energyPayload.points ?? [], energyPayload.meta.timeUnit);
+                powerMode = powerPoints.length > 0 ? "derived" : null;
             }
         }
 
         currentEnergyPayload = {
             ...energyPayload,
-            parityPoints,
+            powerPoints,
+            powerMode,
         };
         renderKpis(energyPayload.kpis);
-        renderChart(energyPayload.points, energyPayload.meta, parityPoints);
+        renderChart(energyPayload.points, energyPayload.meta, powerPoints);
 
         if (powerResult.status === "fulfilled") {
             renderLivePower(powerResult.value.powerFlow ?? null);
@@ -866,7 +894,7 @@ const refreshDashboard = async () => {
             setError("Live power is temporarily unavailable (network reset). Energy charts are still up to date.");
         }
 
-        chartMeta.textContent = buildChartMetaText(energyPayload.meta, Array.isArray(parityPoints) && parityPoints.length > 0);
+        chartMeta.textContent = buildChartMetaText(energyPayload.meta, powerMode);
     } catch (error) {
         setError(error instanceof Error ? error.message : "Failed to load SolarEdge data.");
     } finally {
@@ -886,10 +914,10 @@ viewModeButtons.forEach((button) => {
         updateViewModeUi();
 
         if (currentEnergyPayload) {
-            renderChart(currentEnergyPayload.points, currentEnergyPayload.meta, currentEnergyPayload.parityPoints ?? null);
+            renderChart(currentEnergyPayload.points, currentEnergyPayload.meta, currentEnergyPayload.powerPoints ?? null);
             chartMeta.textContent = buildChartMetaText(
                 currentEnergyPayload.meta,
-                Array.isArray(currentEnergyPayload.parityPoints) && currentEnergyPayload.parityPoints.length > 0,
+                currentEnergyPayload.powerMode ?? null,
             );
         }
     });
