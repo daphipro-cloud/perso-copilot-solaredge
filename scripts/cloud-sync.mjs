@@ -382,4 +382,62 @@ const main = async () => {
     ]);
 
     const rows = normalizeEnergyDetails(energyDetails);
+    const powerRows = normalizePowerDetails(powerDetails);
+
+    const { pointsWritten, days } = await upsertIntervals(siteId, rows);
+    const powerPointsWritten = await upsertPowerIntervals(siteId, powerRows);
+    const dailyRowsWritten = await upsertDailyAggregates(siteId, rows);
+
+    await updateCheckpoint({ siteId, lastSuccessEnd: end, lastError: null });
+    await updateSyncRun({
+      runId,
+      status: "success",
+      pointsRead: rows.length + powerRows.length,
+      pointsWritten: pointsWritten + powerPointsWritten,
+      metadata: {
+        stream: STREAM_NAME,
+        daysRefreshed: days.length,
+        dailyRowsWritten,
+        powerPointsWritten,
+      },
+    });
+
+    console.log("Cloud sync completed", {
+      siteId,
+      runId,
+      start: start.toISOString(),
+      end: end.toISOString(),
+      pointsRead: rows.length,
+      pointsWritten,
+      dailyRowsWritten,
+      powerPointsWritten,
+    });
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+
+    await updateCheckpoint({ siteId, lastSuccessEnd: null, lastError: message }).catch(() => undefined);
+    await updateSyncRun({
+      runId,
+      status: "failed",
+      pointsRead: 0,
+      pointsWritten: 0,
+      errorMessage: message,
+      metadata: { stream: STREAM_NAME },
+    }).catch(() => undefined);
+
+    throw error;
+  }
+};
+
+main().catch((error) => {
+  const message = error instanceof Error ? error.message : String(error);
+  console.error("Cloud sync failed:", message);
+
+  const setupHint = getSetupHint(error);
+  if (setupHint) {
+    console.error(setupHint);
+  }
+
+  process.exitCode = 1;
+});
 
