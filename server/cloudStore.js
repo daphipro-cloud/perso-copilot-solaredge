@@ -198,6 +198,39 @@ export const getLastCloudSyncStatus = async () => {
   };
 };
 
+const getEdgeDay = async (order) => {
+  const rows = await supabaseRequest({
+    path: "/rest/v1/energy_daily_agg",
+    queryEntries: [
+      ["select", "day"],
+      ["site_id", `eq.${APP_CONFIG.solarEdgeSiteId}`],
+      ["order", `day.${order}`],
+      ["limit", "1"],
+    ],
+  });
+
+  return rows?.[0]?.day ?? null;
+};
+
+export const getCloudEnergyDateBounds = async () => {
+  if (!isConfigured()) {
+    return {
+      minDate: null,
+      maxDate: null,
+    };
+  }
+
+  const [minDate, maxDate] = await Promise.all([
+    getEdgeDay("asc"),
+    getEdgeDay("desc"),
+  ]);
+
+  return {
+    minDate,
+    maxDate,
+  };
+};
+
 const buildSummary = ({ points, start, end, timeUnit }) => ({
   meta: {
     timeUnit,

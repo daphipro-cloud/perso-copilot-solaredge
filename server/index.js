@@ -3,7 +3,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 
 import { APP_CONFIG } from "./config.js";
-import { getLastCloudSyncStatus, isCloudStoreConfigured } from "./cloudStore.js";
+import { getCloudEnergyDateBounds, getLastCloudSyncStatus, isCloudStoreConfigured } from "./cloudStore.js";
 import { fetchEnergySummaryForDateRange } from "./energyRequest.js";
 import { getCurrentPowerFlow } from "./solaredgeClient.js";
 
@@ -80,6 +80,20 @@ app.get("/api/energy", async (request, response) => {
   } catch (error) {
     const message = error instanceof Error ? error.message : "Failed to fetch energy summary";
     response.status(400).json({ error: message });
+  }
+});
+
+app.get("/api/energy/bounds", async (_request, response) => {
+  try {
+    const bounds = await getCloudEnergyDateBounds();
+    response.json({
+      ...bounds,
+      today: new Date().toISOString().slice(0, 10),
+    });
+  } catch (error) {
+    response.status(500).json({
+      error: error instanceof Error ? error.message : "Failed to load energy date bounds",
+    });
   }
 });
 

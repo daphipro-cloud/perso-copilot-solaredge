@@ -135,6 +135,13 @@ h1 {
     padding-inline: 0.65rem;
 }
 
+.today-btn {
+    padding-inline: 0.62rem;
+    font-size: 0.76rem;
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
+}
+
 .date-selector input {
     border: 1px solid var(--border);
     border-radius: 10px;
@@ -654,6 +661,11 @@ h1 {
     .day-nav-btn {
         min-width: 1.75rem;
         padding-inline: 0.45rem;
+    }
+
+    .today-btn {
+        padding-inline: 0.45rem;
+        font-size: 0.68rem;
     }
 
     .date-separator {

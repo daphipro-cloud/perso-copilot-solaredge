@@ -3,6 +3,7 @@ const endDateInput = document.getElementById("end-date");
 const refreshButton = document.getElementById("refresh-btn");
 const prevDayButton = document.getElementById("prev-day-btn");
 const nextDayButton = document.getElementById("next-day-btn");
+const todayButton = document.getElementById("today-btn");
 const chartMeta = document.getElementById("chart-meta");
 const errorBanner = document.getElementById("error-banner");
 
@@ -28,6 +29,10 @@ let energyChart = null;
 let dailyCharts = [];
 let chartViewMode = "positive";
 let currentEnergyPayload = null;
+let dateBounds = {
+    minDate: null,
+    maxDate: null,
+};
 const lineChartTimeUnits = new Set(["HOUR", "QUARTER_OF_AN_HOUR"]);
 
 const syncViewportHeight = () => {
@@ -103,6 +108,82 @@ const toIsoDate = (date) => {
     return `${year}-${month}-${day}`;
 };
 
+const clampDateToBounds = (date) => {
+    if (!(date instanceof Date) || Number.isNaN(date.getTime())) {
+        return date;
+    }
+
+    const min = dateBounds.minDate ? parseIsoDate(dateBounds.minDate) : null;
+    const max = dateBounds.maxDate ? parseIsoDate(dateBounds.maxDate) : null;
+
+    if (min && date < min) {
+        return new Date(min);
+    }
+
+    if (max && date > max) {
+        return new Date(max);
+    }
+
+    return date;
+};
+
+const applyDateBoundsToInputs = () => {
+    if (dateBounds.minDate) {
+        startDateInput.min = dateBounds.minDate;
+        endDateInput.min = dateBounds.minDate;
+    }
+
+    if (dateBounds.maxDate) {
+        startDateInput.max = dateBounds.maxDate;
+        endDateInput.max = dateBounds.maxDate;
+    }
+};
+
+const normalizeDateInputsWithinBounds = () => {
+    const start = parseIsoDate(startDateInput.value);
+    const end = parseIsoDate(endDateInput.value);
+
+    if (!start || !end) {
+        return;
+    }
+
+    const clampedStart = clampDateToBounds(start);
+    const clampedEnd = clampDateToBounds(end);
+
+    if (clampedStart > clampedEnd) {
+        startDateInput.value = toIsoDate(clampedEnd);
+        endDateInput.value = toIsoDate(clampedEnd);
+        return;
+    }
+
+    startDateInput.value = toIsoDate(clampedStart);
+    endDateInput.value = toIsoDate(clampedEnd);
+};
+
+const loadDateBounds = async () => {
+    try {
+        const payload = await fetchJson("/api/energy/bounds");
+
+        dateBounds = {
+            minDate: typeof payload.minDate === "string" ? payload.minDate : null,
+            maxDate: typeof payload.maxDate === "string" ? payload.maxDate : payload.today ?? null,
+        };
+
+        applyDateBoundsToInputs();
+        normalizeDateInputsWithinBounds();
+    } catch {
+        const fallbackToday = new Date().toISOString().slice(0, 10);
+
+        dateBounds = {
+            minDate: null,
+            maxDate: fallbackToday,
+        };
+
+        applyDateBoundsToInputs();
+        normalizeDateInputsWithinBounds();
+    }
+};
+
 const shiftDateRangeByDays = (days) => {
     const startDate = parseIsoDate(startDateInput.value);
     const endDate = parseIsoDate(endDateInput.value);
@@ -114,8 +195,27 @@ const shiftDateRangeByDays = (days) => {
     startDate.setDate(startDate.getDate() + days);
     endDate.setDate(endDate.getDate() + days);
 
-    startDateInput.value = toIsoDate(startDate);
-    endDateInput.value = toIsoDate(endDate);
+    const rangeDays = getRangeLengthInDays(startDateInput.value, endDateInput.value) ?? 1;
+    const minDate = dateBounds.minDate ? parseIsoDate(dateBounds.minDate) : null;
+    const maxDate = dateBounds.maxDate ? parseIsoDate(dateBounds.maxDate) : null;
+
+    if (minDate && startDate < minDate) {
+        startDate.setTime(minDate.getTime());
+        endDate.setTime(minDate.getTime());
+        endDate.setDate(endDate.getDate() + rangeDays - 1);
+    }
+
+    if (maxDate && endDate > maxDate) {
+        endDate.setTime(maxDate.getTime());
+        startDate.setTime(maxDate.getTime());
+        startDate.setDate(startDate.getDate() - (rangeDays - 1));
+    }
+
+    const clampedStart = clampDateToBounds(startDate);
+    const clampedEnd = clampDateToBounds(endDate);
+
+    startDateInput.value = toIsoDate(clampedStart);
+    endDateInput.value = toIsoDate(clampedEnd);
     refreshDashboard();
 };
 
@@ -145,7 +245,17 @@ const shouldUseLineChart = (meta) => {
 
 const shouldUseDailySmallMultiples = (meta) => {
     const rangeDays = getRangeLengthInDays(meta?.start, meta?.end);
-    return Boolean(rangeDays && rangeDays >= 2 && rangeDays <= 3 && lineChartTimeUnits.has(meta?.timeUnit ?? "DAY"));
+
+    if (!rangeDays || rangeDays < 2 || rangeDays > 3 || !lineChartTimeUnits.has(meta?.timeUnit ?? "DAY")) {
+        return false;
+    }
+
+    // Mobile portrait can fail to render multiple canvases reliably on some Android devices.
+    if (window.matchMedia("(max-width: 760px)").matches) {
+        return false;
+    }
+
+    return true;
 };
 
 const getDayKey = (label) => {
@@ -239,14 +349,15 @@ const fetchJson = async (url) => {
 };
 
 const renderKpis = (kpis) => {
-    const rate = Number(kpis.selfConsumptionRate ?? 0);
+    const rate = Number(kpis.selfSufficiencyRate ?? 0);
     const normalizedRate = Math.max(0, Math.min(100, rate));
     const productionKwh = Number(kpis.productionKwh ?? 0);
+    const consumptionKwh = Number(kpis.consumptionKwh ?? 0);
+    const importedKwh = Number(kpis.importedKwh ?? Math.max(consumptionKwh - Number(kpis.selfConsumptionKwh ?? 0), 0));
     const selfConsumptionKwh = Number(kpis.selfConsumptionKwh ?? 0);
-    const exportedKwh = Number(kpis.exportedKwh ?? Math.max(productionKwh - selfConsumptionKwh, 0));
-    const safeProductionKwh = productionKwh > 0 ? productionKwh : 0;
-    const selfShare = safeProductionKwh > 0 ? (selfConsumptionKwh / safeProductionKwh) * 100 : 0;
-    const exportShare = safeProductionKwh > 0 ? (exportedKwh / safeProductionKwh) * 100 : 0;
+    const safeConsumptionKwh = consumptionKwh > 0 ? consumptionKwh : 0;
+    const solarCoverageShare = safeConsumptionKwh > 0 ? (selfConsumptionKwh / safeConsumptionKwh) * 100 : 0;
+    const gridShare = safeConsumptionKwh > 0 ? (importedKwh / safeConsumptionKwh) * 100 : 0;
 
     kpiConsumption.textContent = formatKwh(kpis.consumptionKwh);
     kpiProduction.textContent = formatKwh(kpis.productionKwh);
@@ -269,26 +380,26 @@ const renderKpis = (kpis) => {
     }
 
     if (kpiSelfSolarFill) {
-        kpiSelfSolarFill.style.width = `${Math.max(0, Math.min(100, selfShare))}%`;
+        kpiSelfSolarFill.style.width = `${Math.max(0, Math.min(100, solarCoverageShare))}%`;
     }
 
     if (kpiSelfExportFill) {
-        kpiSelfExportFill.style.width = `${Math.max(0, Math.min(100, exportShare))}%`;
+        kpiSelfExportFill.style.width = `${Math.max(0, Math.min(100, gridShare))}%`;
     }
 
     if (kpiSelfSplitLabel) {
-        kpiSelfSplitLabel.textContent = `Self-used ${formatKwh(selfConsumptionKwh)} of ${formatKwh(productionKwh)} produced, exported ${formatKwh(exportedKwh)}.`;
+        kpiSelfSplitLabel.textContent = `Solar covered ${formatKwh(selfConsumptionKwh)} of ${formatKwh(consumptionKwh)} consumed, grid supplied ${formatKwh(importedKwh)}.`;
     }
 
     if (kpiSelfRateLabel) {
         if (normalizedRate >= 85) {
-            kpiSelfRateLabel.textContent = "Excellent self-usage: most production stays at home.";
+            kpiSelfRateLabel.textContent = "Excellent coverage: most home demand is met by solar.";
         } else if (normalizedRate >= 65) {
-            kpiSelfRateLabel.textContent = "Good self-usage: most production is used locally.";
+            kpiSelfRateLabel.textContent = "Good coverage: solar meets a large share of demand.";
         } else if (normalizedRate >= 45) {
-            kpiSelfRateLabel.textContent = "Moderate self-usage: consider shifting loads to solar hours.";
+            kpiSelfRateLabel.textContent = "Moderate coverage: shift loads to solar hours when possible.";
         } else {
-            kpiSelfRateLabel.textContent = "Low self-usage: much of the production is exported.";
+            kpiSelfRateLabel.textContent = "Low coverage: most demand is still supplied by grid.";
         }
     }
 };
@@ -690,9 +801,11 @@ updateViewModeUi();
 
 
 startDateInput.addEventListener("change", () => {
+    normalizeDateInputsWithinBounds();
     refreshDashboard();
 });
 endDateInput.addEventListener("change", () => {
+    normalizeDateInputsWithinBounds();
     refreshDashboard();
 });
 
@@ -712,4 +825,16 @@ if (nextDayButton) {
     });
 }
 
+if (todayButton) {
+    todayButton.addEventListener("click", () => {
+        const max = dateBounds.maxDate ? parseIsoDate(dateBounds.maxDate) : new Date();
+        const target = clampDateToBounds(max ?? new Date());
+        const iso = toIsoDate(target);
+        startDateInput.value = iso;
+        endDateInput.value = iso;
+        refreshDashboard();
+    });
+}
+
+await loadDateBounds();
 refreshDashboard();

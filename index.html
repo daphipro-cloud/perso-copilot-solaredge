@@ -43,6 +43,7 @@
                     <label for="end-date" class="sr-only">End date</label>
                     <input type="date" id="end-date" name="endDate">
                     <button type="button" id="next-day-btn" class="range-btn day-nav-btn" aria-label="Move to next day">&gt;</button>
+                    <button type="button" id="today-btn" class="range-btn today-btn" aria-label="Jump to today">Today</button>
                 </article>
                 <article class="view-toggle" aria-label="Chart view mode">
                     <span class="view-toggle-label">Chart view</span>
@@ -77,7 +78,7 @@
                 </dl>
 
                 <article class="live-self-rate-card" aria-label="Self-consumption rate details">
-                    <h3>Self-Consumption Rate</h3>
+                    <h3>Solar Coverage Rate</h3>
                     <div id="kpi-self-rate-gauge" class="self-rate-gauge" role="img" aria-label="Self-consumption rate gauge">
                         <div class="self-rate-gauge-inner">
                             <p id="kpi-self-rate" class="kpi-value">-</p>
