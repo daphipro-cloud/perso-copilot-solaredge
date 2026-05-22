@@ -27,7 +27,7 @@ const viewModeButtons = document.querySelectorAll(".view-mode-btn");
 
 let energyChart = null;
 let dailyCharts = [];
-let chartViewMode = "positive";
+let chartViewMode = "split";
 let currentEnergyPayload = null;
 let dateBounds = {
     minDate: null,
