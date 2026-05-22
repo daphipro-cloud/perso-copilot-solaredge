@@ -1,7 +1,7 @@
 import dotenv from "dotenv";
 
 import { APP_CONFIG } from "../server/config.js";
-import { getEnergyDetailsData } from "../server/solaredgeClient.js";
+import { getEnergyDetailsData, getPowerDetailsData } from "../server/solaredgeClient.js";
 import { normalizeEnergyDetails } from "../server/aggregator.js";
 
 dotenv.config();
@@ -50,6 +50,7 @@ const toDayStringUtc = (date) => {
 };
 
 const toKwh = (wh) => Number((Number(wh ?? 0) / 1000).toFixed(4));
+const toKw = (value) => Number(Number(value ?? 0).toFixed(4));
 
 const getSelfConsumptionKwh = (productionKwh, consumptionKwh, exportKwh) => {
   if (exportKwh > 0) {
@@ -57,6 +58,68 @@ const getSelfConsumptionKwh = (productionKwh, consumptionKwh, exportKwh) => {
   }
 
   return Math.min(productionKwh, consumptionKwh);
+};
+
+const normalizeMeterType = (value) => String(value ?? "").toUpperCase().replace(/[^A-Z]/g, "");
+
+const normalizePowerDetails = (powerDetails) => {
+  const pointsByDate = new Map();
+  const meters = powerDetails?.meters ?? [];
+
+  const fieldByType = {
+    PRODUCTION: "productionKw",
+    CONSUMPTION: "consumptionKw",
+    FEEDIN: "toGridKw",
+    PURCHASED: "fromGridKw",
+    SELFCONSUMPTION: "fromPvKw",
+  };
+
+  for (const meter of meters) {
+    const type = normalizeMeterType(meter?.type);
+    const field = fieldByType[type];
+
+    if (!field) {
+      continue;
+    }
+
+    for (const entry of meter.values ?? []) {
+      const date = entry?.date;
+
+      if (!date) {
+        continue;
+      }
+
+      const current = pointsByDate.get(date) ?? {
+        date,
+        productionKw: 0,
+        toBuildingKw: 0,
+        toGridKw: 0,
+        consumptionKw: 0,
+        fromPvKw: 0,
+        fromGridKw: 0,
+      };
+
+      current[field] = toKw(entry.value);
+      pointsByDate.set(date, current);
+    }
+  }
+
+  return [...pointsByDate.values()]
+    .sort((left, right) => left.date.localeCompare(right.date))
+    .map((row) => {
+      const fromPvKw = row.fromPvKw > 0 ? row.fromPvKw : Math.min(row.productionKw, row.consumptionKw);
+      const toBuildingKw = row.toBuildingKw > 0 ? row.toBuildingKw : fromPvKw;
+      const toGridKw = row.toGridKw > 0 ? row.toGridKw : Math.max(row.productionKw - fromPvKw, 0);
+      const fromGridKw = row.fromGridKw > 0 ? row.fromGridKw : Math.max(row.consumptionKw - fromPvKw, 0);
+
+      return {
+        ...row,
+        fromPvKw: toKw(fromPvKw),
+        toBuildingKw: toKw(toBuildingKw),
+        toGridKw: toKw(toGridKw),
+        fromGridKw: toKw(fromGridKw),
+      };
+    });
 };
 
 const supabaseRequest = async ({ method, path, body, query, prefer }) => {
@@ -246,6 +309,49 @@ const upsertIntervals = async (siteId, rows) => {
   };
 };
 
+const upsertPowerIntervals = async (siteId, rows) => {
+  const mapped = [];
+
+  for (const row of rows) {
+    const start = toDate(row.date);
+
+    if (!start) {
+      continue;
+    }
+
+    const end = addMinutes(start, SYNC_STEP_MINUTES);
+
+    mapped.push({
+      site_id: siteId,
+      interval_start: start.toISOString(),
+      interval_end: end.toISOString(),
+      time_unit: "QUARTER_OF_AN_HOUR",
+      production_kw: toKw(row.productionKw),
+      to_building_kw: toKw(row.toBuildingKw),
+      to_grid_kw: toKw(row.toGridKw),
+      consumption_kw: toKw(row.consumptionKw),
+      from_pv_kw: toKw(row.fromPvKw),
+      from_grid_kw: toKw(row.fromGridKw),
+      raw_payload: row,
+      ingested_at: new Date().toISOString(),
+    });
+  }
+
+  for (const batch of chunk(mapped, CHUNK_SIZE)) {
+    await supabaseRequest({
+      method: "POST",
+      path: "/rest/v1/power_intervals",
+      query: {
+        on_conflict: "site_id,interval_start,interval_end,time_unit",
+      },
+      prefer: "resolution=merge-duplicates,return=representation",
+      body: batch,
+    });
+  }
+
+  return mapped.length;
+};
+
 const upsertDailyAggregates = async (siteId, rows) => {
   const byDay = new Map();
 
@@ -323,26 +429,37 @@ const main = async () => {
   const runId = await insertSyncRun(siteId, start, end);
 
   try {
-    const energyDetails = await getEnergyDetailsData({
-      start,
-      end,
-      timeUnit: "QUARTER_OF_AN_HOUR",
-    });
+    const [energyDetails, powerDetails] = await Promise.all([
+      getEnergyDetailsData({
+        start,
+        end,
+        timeUnit: "QUARTER_OF_AN_HOUR",
+      }),
+      getPowerDetailsData({
+        start,
+        end,
+        timeUnit: "QUARTER_OF_AN_HOUR",
+      }),
+    ]);
+
     const rows = normalizeEnergyDetails(energyDetails);
+    const powerRows = normalizePowerDetails(powerDetails);
 
     const { pointsWritten, days } = await upsertIntervals(siteId, rows);
+    const powerPointsWritten = await upsertPowerIntervals(siteId, powerRows);
     const dailyRowsWritten = await upsertDailyAggregates(siteId, rows);
 
     await updateCheckpoint({ siteId, lastSuccessEnd: end, lastError: null });
     await updateSyncRun({
       runId,
       status: "success",
-      pointsRead: rows.length,
-      pointsWritten,
+      pointsRead: rows.length + powerRows.length,
+      pointsWritten: pointsWritten + powerPointsWritten,
       metadata: {
         stream: STREAM_NAME,
         daysRefreshed: days.length,
         dailyRowsWritten,
+        powerPointsWritten,
       },
     });
 
@@ -354,6 +471,7 @@ const main = async () => {
       pointsRead: rows.length,
       pointsWritten,
       dailyRowsWritten,
+      powerPointsWritten,
     });
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);

@@ -42,6 +42,7 @@ Open `http://localhost:3000`.
 - Self-consumption is computed as `production - feedIn`, with `min(production, consumption)` fallback.
 - `/api/energy` now reads cloud-stored history first when `SUPABASE_URL` and `SUPABASE_SERVICE_ROLE_KEY` are set, then falls back to direct SolarEdge API aggregation.
 - `/api/energy` responses include `source` (`supabase` or `solaredge`) and mirror this in `meta.source` for debugging which backend path served the data.
+- `power_intervals` stores kW interval parity data from SolarEdge `powerDetails` for like-for-like comparison with SolarEdge monitoring CSV exports.
 - Never commit real keys in `.env.example` or any tracked file. Keep real values only in local `.env` and CI/CD secrets.
 
 ## 6. Cloud Deployment Blueprint
@@ -49,4 +50,4 @@ Open `http://localhost:3000`.
 - Architecture and step-by-step rollout: [docs/cloud-deployment-blueprint.md](docs/cloud-deployment-blueprint.md)
 - PostgreSQL schema for Supabase/Neon: [db/schema.sql](db/schema.sql)
 - Scheduled ingestion workflow template: [.github/workflows/solaredge-sync.yml](.github/workflows/solaredge-sync.yml)
-- Final production runbook: [docs/production-go-live-checklist.md](docs/production-go-live-checklist.md)
+ls- Final production runbook: [docs/production-go-live-checklist.md](docs/production-go-live-checklist.md)

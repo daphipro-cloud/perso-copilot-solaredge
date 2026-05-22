@@ -27,9 +27,10 @@ This is a strict single-path runbook for always-on production:
 2. Run all SQL from [../db/schema.sql](../db/schema.sql).
 3. Verify tables exist:
 1. energy_intervals
-2. energy_daily_agg
-3. sync_checkpoints
-4. sync_runs
+2. power_intervals
+3. energy_daily_agg
+4. sync_checkpoints
+5. sync_runs
 
 ## 4. Configure GitHub Actions Secrets
 

@@ -146,3 +146,15 @@ export const getEnergyDetailsData = async ({ start, end, timeUnit }) => {
 
   return payload.energyDetails ?? null;
 };
+
+export const getPowerDetailsData = async ({ start, end, timeUnit }) => {
+  const path = `/site/${APP_CONFIG.solarEdgeSiteId}/powerDetails`;
+  const payload = await requestSolarEdge(path, {
+    startTime: toDateTimeString(start),
+    endTime: toDateTimeString(end),
+    timeUnit,
+    meters: "PRODUCTION,CONSUMPTION,FEEDIN,PURCHASED,SELFCONSUMPTION",
+  });
+
+  return payload.powerDetails ?? null;
+};
