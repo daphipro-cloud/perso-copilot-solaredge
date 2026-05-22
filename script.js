@@ -424,7 +424,7 @@ const createAreaDataset = ({ label, data, borderColor, backgroundColor }) => ({
     fill: true,
 });
 
-const createLineDataset = ({ label, data, borderColor, backgroundColor }) => ({
+const createLineDataset = ({ label, data, borderColor, backgroundColor, fill = false }) => ({
     type: "line",
     label,
     data,
@@ -433,7 +433,7 @@ const createLineDataset = ({ label, data, borderColor, backgroundColor }) => ({
     borderWidth: 2,
     pointRadius: 0,
     tension: 0.25,
-    fill: false,
+    fill,
 });
 
 const buildDatasets = ({ points, showLineChart, showSplitView }) => {
@@ -571,44 +571,125 @@ const buildDatasets = ({ points, showLineChart, showSplitView }) => {
     return datasets;
 };
 
-const buildPowerDatasets = (points) => [
-    createLineDataset({
-        label: "Production (kW)",
-        data: points.map((point) => point.productionKw),
-        borderColor: "#2a9563",
-        backgroundColor: "rgba(42, 149, 99, 0.14)",
-    }),
-    createLineDataset({
-        label: "To Building (kW)",
-        data: points.map((point) => point.toBuildingKw),
-        borderColor: "#2e7cf6",
-        backgroundColor: "rgba(46, 124, 246, 0.14)",
-    }),
-    createLineDataset({
-        label: "To Grid (kW)",
-        data: points.map((point) => point.toGridKw),
-        borderColor: "#6b5bd4",
-        backgroundColor: "rgba(107, 91, 212, 0.14)",
-    }),
-    createLineDataset({
-        label: "Consumption (kW)",
-        data: points.map((point) => point.consumptionKw),
-        borderColor: "#0a5a91",
-        backgroundColor: "rgba(10, 90, 145, 0.14)",
-    }),
-    createLineDataset({
-        label: "From PV (kW)",
-        data: points.map((point) => point.fromPvKw),
-        borderColor: "#f2994a",
-        backgroundColor: "rgba(242, 153, 74, 0.14)",
-    }),
-    createLineDataset({
-        label: "From Grid (kW)",
-        data: points.map((point) => point.fromGridKw),
-        borderColor: "#d1632e",
-        backgroundColor: "rgba(209, 99, 46, 0.14)",
-    }),
-];
+const buildPowerDatasets = ({ points, showLineChart, showSplitView }) => {
+    const productionValues = points.map((point) => point.productionKw);
+    const consumptionValues = points.map((point) => point.consumptionKw);
+    const toGridValues = points.map((point) => point.toGridKw);
+    const fromPvValues = points.map((point) => point.fromPvKw);
+    const fromGridValues = points.map((point) => point.fromGridKw);
+    const negativeFromGridValues = fromGridValues.map((value) => -value);
+
+    const datasets = [];
+
+    if (!showSplitView) {
+        datasets.push(
+            showLineChart
+                ? createAreaDataset({
+                    label: "Consumption (kW)",
+                    data: consumptionValues,
+                    borderColor: "#0a5a91",
+                    backgroundColor: "rgba(10, 90, 145, 0.20)",
+                })
+                : {
+                    type: "bar",
+                    label: "Consumption (kW)",
+                    data: consumptionValues,
+                    backgroundColor: "rgba(10, 90, 145, 0.65)",
+                    borderColor: "#0a5a91",
+                    borderWidth: 1,
+                },
+        );
+
+        datasets.push(
+            showLineChart
+                ? createAreaDataset({
+                    label: "Production (kW)",
+                    data: productionValues,
+                    borderColor: "#2a9563",
+                    backgroundColor: "rgba(42, 149, 99, 0.16)",
+                })
+                : {
+                    type: "bar",
+                    label: "Production (kW)",
+                    data: productionValues,
+                    backgroundColor: "rgba(42, 149, 99, 0.65)",
+                    borderColor: "#2a9563",
+                    borderWidth: 1,
+                },
+        );
+
+        if (toGridValues.some((value) => value > 0)) {
+            datasets.push(
+                createLineDataset({
+                    label: "To Grid (kW)",
+                    data: toGridValues,
+                    borderColor: "#6b5bd4",
+                    backgroundColor: "rgba(107, 91, 212, 0.14)",
+                }),
+            );
+        }
+    } else {
+        datasets.push(
+            showLineChart
+                ? createAreaDataset({
+                    label: "Production (kW)",
+                    data: productionValues,
+                    borderColor: "#2a9563",
+                    backgroundColor: "rgba(42, 149, 99, 0.18)",
+                })
+                : {
+                    type: "bar",
+                    label: "Production (kW)",
+                    data: productionValues,
+                    backgroundColor: "rgba(42, 149, 99, 0.65)",
+                    borderColor: "#2a9563",
+                    borderWidth: 1,
+                },
+        );
+
+        if (fromPvValues.some((value) => value > 0)) {
+            datasets.push(
+                showLineChart
+                    ? createAreaDataset({
+                        label: "From PV (kW)",
+                        data: fromPvValues.map((value) => -value),
+                        borderColor: "#0a5a91",
+                        backgroundColor: "rgba(10, 90, 145, 0.22)",
+                    })
+                    : {
+                        type: "bar",
+                        label: "From PV (kW)",
+                        data: fromPvValues.map((value) => -value),
+                        backgroundColor: "rgba(10, 90, 145, 0.65)",
+                        borderColor: "#0a5a91",
+                        borderWidth: 1,
+                    },
+            );
+        }
+
+        if (fromGridValues.some((value) => value > 0)) {
+            datasets.push(
+                showLineChart
+                    ? createAreaDataset({
+                        label: "From Grid (kW)",
+                        data: negativeFromGridValues,
+                        borderColor: "#d1632e",
+                        backgroundColor: "rgba(209, 99, 46, 0.18)",
+                    })
+                    : {
+                        type: "bar",
+                        label: "From Grid (kW)",
+                        data: negativeFromGridValues,
+                        backgroundColor: "rgba(209, 99, 46, 0.65)",
+                        borderColor: "#d1632e",
+                        borderWidth: 1,
+                    },
+            );
+        }
+    }
+
+    return datasets;
+};
 
 const toPowerPointsFromEnergy = (energyPoints, timeUnit) => {
     const multiplier = timeUnit === "QUARTER_OF_AN_HOUR" ? 4 : 1;
@@ -646,7 +727,7 @@ const buildChartOptions = ({
         padding: {
             top: 6,
             right: 8,
-            bottom: 10,
+            bottom: 18,
             left: 6,
         },
     },
@@ -671,8 +752,8 @@ const buildChartOptions = ({
         x: {
             ticks: {
                 autoSkip: true,
-                autoSkipPadding: 12,
-                padding: 8,
+                autoSkipPadding: 14,
+                padding: 10,
                 maxRotation: 0,
                 minRotation: 0,
                 maxTicksLimit: xAxisTickLimit,
@@ -786,7 +867,7 @@ const renderChart = (energyPoints, meta, powerPoints = null) => {
     const labels = rawLabels.map((label) => formatLabel(label, timeUnit));
     const xAxisTickLimit = getXAxisTickLimit(timeUnit, chartPoints.length);
     const datasets = hasParityPower
-        ? buildPowerDatasets(chartPoints)
+        ? buildPowerDatasets({ points: chartPoints, showLineChart, showSplitView })
         : buildDatasets({ points: chartPoints, showLineChart, showSplitView });
 
     const datasetConfig = {

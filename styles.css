@@ -516,8 +516,8 @@ h1 {
     .chart-panel {
         grid-area: chart;
         display: grid;
-        grid-template-rows: auto minmax(0, 1fr);
-        padding-bottom: 0.85rem;
+        grid-template-rows: auto minmax(220px, 1fr);
+        padding-bottom: 1.1rem;
     }
 
     .live-panel {
@@ -542,7 +542,7 @@ h1 {
 
     #energy-chart {
         height: 100%;
-        min-height: 180px;
+        min-height: 220px;
     }
 }
 
