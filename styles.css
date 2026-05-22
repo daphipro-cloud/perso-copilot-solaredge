@@ -484,7 +484,7 @@ h1 {
     }
 
     body {
-        overflow: hidden;
+        overflow: auto;
     }
 
     .page-header {
@@ -501,7 +501,7 @@ h1 {
             "chart live"
             "error error";
         align-items: stretch;
-        overflow: hidden;
+        overflow: auto;
     }
 
     .kpi-grid {
@@ -516,8 +516,8 @@ h1 {
     .chart-panel {
         grid-area: chart;
         display: grid;
-        grid-template-rows: auto minmax(220px, 1fr);
-        padding-bottom: 1.1rem;
+        grid-template-rows: auto minmax(240px, 1fr);
+        padding-bottom: 1.2rem;
     }
 
     .live-panel {
@@ -542,7 +542,7 @@ h1 {
 
     #energy-chart {
         height: 100%;
-        min-height: 220px;
+        min-height: 240px;
     }
 }
 

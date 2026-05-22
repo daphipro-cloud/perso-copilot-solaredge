@@ -847,7 +847,7 @@ const renderChart = (energyPoints, meta, powerPoints = null) => {
     const hasParityPower = Array.isArray(powerPoints) && powerPoints.length > 0;
     const chartPoints = hasParityPower ? powerPoints : energyPoints;
     const showLineChart = shouldUseLineChart(meta);
-    const showSplitView = !hasParityPower && chartViewMode === "split";
+    const showSplitView = chartViewMode === "split";
     const useDailySmallMultiples = !hasParityPower && shouldUseDailySmallMultiples(meta);
 
     if (useDailySmallMultiples) {
