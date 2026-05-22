@@ -3,7 +3,12 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 
 import { APP_CONFIG } from "./config.js";
-import { getCloudEnergyDateBounds, getLastCloudSyncStatus, isCloudStoreConfigured } from "./cloudStore.js";
+import {
+  getCloudEnergyDateBounds,
+  getLastCloudSyncStatus,
+  getPowerIntervalSummaryFromCloudStore,
+  isCloudStoreConfigured,
+} from "./cloudStore.js";
 import { fetchEnergySummaryForDateRange } from "./energyRequest.js";
 import { getCurrentPowerFlow } from "./solaredgeClient.js";
 
@@ -93,6 +98,32 @@ app.get("/api/energy/bounds", async (_request, response) => {
   } catch (error) {
     response.status(500).json({
       error: error instanceof Error ? error.message : "Failed to load energy date bounds",
+    });
+  }
+});
+
+app.get("/api/power/intervals", async (request, response) => {
+  const start = typeof request.query.start === "string" ? request.query.start : undefined;
+  const end = typeof request.query.end === "string" ? request.query.end : undefined;
+  const timeUnit = typeof request.query.timeUnit === "string" ? request.query.timeUnit : "QUARTER_OF_AN_HOUR";
+
+  if (!start || !end) {
+    response.status(400).json({ error: "Both start and end dates are required (YYYY-MM-DD)." });
+    return;
+  }
+
+  try {
+    const summary = await getPowerIntervalSummaryFromCloudStore({ start, end, timeUnit });
+
+    if (!summary) {
+      response.status(404).json({ error: "No parity power data found for selected range." });
+      return;
+    }
+
+    response.json(summary);
+  } catch (error) {
+    response.status(500).json({
+      error: error instanceof Error ? error.message : "Failed to load parity power intervals",
     });
   }
 });

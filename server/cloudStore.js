@@ -164,6 +164,80 @@ const loadDailyRows = async ({ start, end }) => {
   return rows;
 };
 
+const loadPowerIntervalRows = async ({ start, end }) => {
+  const rows = await supabaseRequest({
+    path: "/rest/v1/power_intervals",
+    queryEntries: [
+      ["select", "interval_start,production_kw,to_building_kw,to_grid_kw,consumption_kw,from_pv_kw,from_grid_kw"],
+      ["site_id", `eq.${APP_CONFIG.solarEdgeSiteId}`],
+      ["interval_start", `gte.${startOfDayIso(start)}`],
+      ["interval_start", `lt.${nextDayIso(end)}`],
+      ["time_unit", "eq.QUARTER_OF_AN_HOUR"],
+      ["order", "interval_start.asc"],
+      ["limit", "10000"],
+    ],
+  });
+
+  return rows;
+};
+
+const toPowerPoint = (row) => ({
+  label: row.interval_start,
+  productionKw: Number(row.production_kw ?? 0),
+  toBuildingKw: Number(row.to_building_kw ?? 0),
+  toGridKw: Number(row.to_grid_kw ?? 0),
+  consumptionKw: Number(row.consumption_kw ?? 0),
+  fromPvKw: Number(row.from_pv_kw ?? 0),
+  fromGridKw: Number(row.from_grid_kw ?? 0),
+});
+
+const aggregatePowerIntervalsByHour = (rows) => {
+  const buckets = new Map();
+
+  rows.forEach((row) => {
+    const startDate = parseDate(row.interval_start);
+
+    if (!startDate) {
+      return;
+    }
+
+    startDate.setUTCMinutes(0, 0, 0);
+    const key = startDate.toISOString();
+    const current = buckets.get(key) ?? {
+      label: key,
+      productionKw: 0,
+      toBuildingKw: 0,
+      toGridKw: 0,
+      consumptionKw: 0,
+      fromPvKw: 0,
+      fromGridKw: 0,
+      count: 0,
+    };
+
+    current.productionKw += Number(row.production_kw ?? 0);
+    current.toBuildingKw += Number(row.to_building_kw ?? 0);
+    current.toGridKw += Number(row.to_grid_kw ?? 0);
+    current.consumptionKw += Number(row.consumption_kw ?? 0);
+    current.fromPvKw += Number(row.from_pv_kw ?? 0);
+    current.fromGridKw += Number(row.from_grid_kw ?? 0);
+    current.count += 1;
+
+    buckets.set(key, current);
+  });
+
+  return [...buckets.values()]
+    .sort((left, right) => left.label.localeCompare(right.label))
+    .map((row) => ({
+      label: row.label,
+      productionKw: row.count > 0 ? Number((row.productionKw / row.count).toFixed(4)) : 0,
+      toBuildingKw: row.count > 0 ? Number((row.toBuildingKw / row.count).toFixed(4)) : 0,
+      toGridKw: row.count > 0 ? Number((row.toGridKw / row.count).toFixed(4)) : 0,
+      consumptionKw: row.count > 0 ? Number((row.consumptionKw / row.count).toFixed(4)) : 0,
+      fromPvKw: row.count > 0 ? Number((row.fromPvKw / row.count).toFixed(4)) : 0,
+      fromGridKw: row.count > 0 ? Number((row.fromGridKw / row.count).toFixed(4)) : 0,
+    }));
+};
+
 export const getLastCloudSyncStatus = async () => {
   if (!isConfigured()) {
     return {
@@ -284,4 +358,36 @@ export const getEnergySummaryFromCloudStore = async ({ start, end, timeUnit }) =
     end,
     timeUnit,
   });
+};
+
+export const getPowerIntervalSummaryFromCloudStore = async ({ start, end, timeUnit }) => {
+  if (!isConfigured()) {
+    return null;
+  }
+
+  if (!INTERVAL_TIME_UNITS.has(timeUnit)) {
+    return null;
+  }
+
+  const rows = await loadPowerIntervalRows({ start, end });
+
+  if (!Array.isArray(rows) || rows.length === 0) {
+    return null;
+  }
+
+  const points = timeUnit === "HOUR"
+    ? aggregatePowerIntervalsByHour(rows)
+    : rows.map(toPowerPoint);
+
+  return {
+    meta: {
+      timeUnit,
+      start,
+      end,
+      unit: "kW",
+      source: "supabase_power_intervals",
+      generatedAt: new Date().toISOString(),
+    },
+    points,
+  };
 };

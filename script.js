@@ -424,6 +424,18 @@ const createAreaDataset = ({ label, data, borderColor, backgroundColor }) => ({
     fill: true,
 });
 
+const createLineDataset = ({ label, data, borderColor, backgroundColor }) => ({
+    type: "line",
+    label,
+    data,
+    borderColor,
+    backgroundColor,
+    borderWidth: 2,
+    pointRadius: 0,
+    tension: 0.25,
+    fill: false,
+});
+
 const buildDatasets = ({ points, showLineChart, showSplitView }) => {
     const productionValues = points.map((point) => point.productionKwh);
     const consumptionValues = points.map((point) => point.consumptionKwh);
@@ -559,7 +571,53 @@ const buildDatasets = ({ points, showLineChart, showSplitView }) => {
     return datasets;
 };
 
-const buildChartOptions = ({ rawLabels, showLineChart, xAxisTickLimit, hideLegend = false }) => ({
+const buildPowerDatasets = (points) => [
+    createLineDataset({
+        label: "Production (kW)",
+        data: points.map((point) => point.productionKw),
+        borderColor: "#2a9563",
+        backgroundColor: "rgba(42, 149, 99, 0.14)",
+    }),
+    createLineDataset({
+        label: "To Building (kW)",
+        data: points.map((point) => point.toBuildingKw),
+        borderColor: "#2e7cf6",
+        backgroundColor: "rgba(46, 124, 246, 0.14)",
+    }),
+    createLineDataset({
+        label: "To Grid (kW)",
+        data: points.map((point) => point.toGridKw),
+        borderColor: "#6b5bd4",
+        backgroundColor: "rgba(107, 91, 212, 0.14)",
+    }),
+    createLineDataset({
+        label: "Consumption (kW)",
+        data: points.map((point) => point.consumptionKw),
+        borderColor: "#0a5a91",
+        backgroundColor: "rgba(10, 90, 145, 0.14)",
+    }),
+    createLineDataset({
+        label: "From PV (kW)",
+        data: points.map((point) => point.fromPvKw),
+        borderColor: "#f2994a",
+        backgroundColor: "rgba(242, 153, 74, 0.14)",
+    }),
+    createLineDataset({
+        label: "From Grid (kW)",
+        data: points.map((point) => point.fromGridKw),
+        borderColor: "#d1632e",
+        backgroundColor: "rgba(209, 99, 46, 0.14)",
+    }),
+];
+
+const buildChartOptions = ({
+    rawLabels,
+    showLineChart,
+    xAxisTickLimit,
+    hideLegend = false,
+    yAxisUnit = "kWh",
+    useAbsoluteTicks = true,
+}) => ({
     responsive: true,
     maintainAspectRatio: false,
     layout: {
@@ -605,10 +663,14 @@ const buildChartOptions = ({ rawLabels, showLineChart, xAxisTickLimit, hideLegen
             beginAtZero: true,
             title: {
                 display: !hideLegend,
-                text: "kWh",
+                text: yAxisUnit,
             },
             ticks: {
-                callback: (value) => Math.abs(Number(value)).toLocaleString(undefined, { maximumFractionDigits: 2 }),
+                callback: (value) => {
+                    const numericValue = Number(value);
+                    const displayValue = useAbsoluteTicks ? Math.abs(numericValue) : numericValue;
+                    return displayValue.toLocaleString(undefined, { maximumFractionDigits: 2 });
+                },
             },
             grid: {
                 color: (context) => context.tick.value === 0
@@ -668,6 +730,8 @@ const renderDailySmallMultiples = ({ points, meta, showSplitView }) => {
                 showLineChart: true,
                 xAxisTickLimit,
                 hideLegend: true,
+                yAxisUnit: "kWh",
+                useAbsoluteTicks: true,
             }),
         });
 
@@ -675,11 +739,13 @@ const renderDailySmallMultiples = ({ points, meta, showSplitView }) => {
     });
 };
 
-const renderChart = (points, meta) => {
+const renderChart = (energyPoints, meta, powerPoints = null) => {
     const timeUnit = meta?.timeUnit ?? "DAY";
+    const hasParityPower = Array.isArray(powerPoints) && powerPoints.length > 0;
+    const chartPoints = hasParityPower ? powerPoints : energyPoints;
     const showLineChart = shouldUseLineChart(meta);
-    const showSplitView = chartViewMode === "split";
-    const useDailySmallMultiples = shouldUseDailySmallMultiples(meta);
+    const showSplitView = !hasParityPower && chartViewMode === "split";
+    const useDailySmallMultiples = !hasParityPower && shouldUseDailySmallMultiples(meta);
 
     if (useDailySmallMultiples) {
         if (energyChart) {
@@ -687,17 +753,19 @@ const renderChart = (points, meta) => {
             energyChart = null;
         }
 
-        renderDailySmallMultiples({ points, meta, showSplitView });
+        renderDailySmallMultiples({ points: chartPoints, meta, showSplitView });
         return;
     }
 
     clearDailyCharts();
     chartCanvas.hidden = false;
 
-    const rawLabels = points.map((point) => point.label);
+    const rawLabels = chartPoints.map((point) => point.label);
     const labels = rawLabels.map((label) => formatLabel(label, timeUnit));
-    const xAxisTickLimit = getXAxisTickLimit(timeUnit, points.length);
-    const datasets = buildDatasets({ points, showLineChart, showSplitView });
+    const xAxisTickLimit = getXAxisTickLimit(timeUnit, chartPoints.length);
+    const datasets = hasParityPower
+        ? buildPowerDatasets(chartPoints)
+        : buildDatasets({ points: chartPoints, showLineChart, showSplitView });
 
     const datasetConfig = {
         labels,
@@ -710,11 +778,17 @@ const renderChart = (points, meta) => {
 
     energyChart = new Chart(chartCanvas, {
         data: datasetConfig,
-        options: buildChartOptions({ rawLabels, showLineChart, xAxisTickLimit }),
+        options: buildChartOptions({
+            rawLabels,
+            showLineChart,
+            xAxisTickLimit,
+            yAxisUnit: hasParityPower ? "kW" : "kWh",
+            useAbsoluteTicks: !hasParityPower,
+        }),
     });
 };
 
-const buildChartMetaText = (meta) => {
+const buildChartMetaText = (meta, hasParityPower = false) => {
     let text = `${meta.start} to ${meta.end}`;
 
     if (isSingleDayRange(meta.start, meta.end)) {
@@ -728,6 +802,10 @@ const buildChartMetaText = (meta) => {
     text += chartViewMode === "split"
         ? " • split +/-"
         : " • all positive";
+
+    if (hasParityPower) {
+        text += " • parity mode (kW)";
+    }
 
     return text;
 };
@@ -760,9 +838,26 @@ const refreshDashboard = async () => {
         }
 
         const energyPayload = energyResult.value;
-        currentEnergyPayload = energyPayload;
+        let parityPoints = null;
+
+        if (lineChartTimeUnits.has(energyPayload?.meta?.timeUnit ?? "DAY")) {
+            try {
+                const parityPayload = await fetchJson(
+                    `/api/power/intervals?start=${encodeURIComponent(start)}&end=${encodeURIComponent(end)}&timeUnit=${encodeURIComponent(energyPayload.meta.timeUnit)}`,
+                );
+
+                parityPoints = Array.isArray(parityPayload?.points) ? parityPayload.points : null;
+            } catch {
+                // Keep energy chart fallback when parity rows are unavailable.
+            }
+        }
+
+        currentEnergyPayload = {
+            ...energyPayload,
+            parityPoints,
+        };
         renderKpis(energyPayload.kpis);
-        renderChart(energyPayload.points, energyPayload.meta);
+        renderChart(energyPayload.points, energyPayload.meta, parityPoints);
 
         if (powerResult.status === "fulfilled") {
             renderLivePower(powerResult.value.powerFlow ?? null);
@@ -771,7 +866,7 @@ const refreshDashboard = async () => {
             setError("Live power is temporarily unavailable (network reset). Energy charts are still up to date.");
         }
 
-        chartMeta.textContent = buildChartMetaText(energyPayload.meta);
+        chartMeta.textContent = buildChartMetaText(energyPayload.meta, Array.isArray(parityPoints) && parityPoints.length > 0);
     } catch (error) {
         setError(error instanceof Error ? error.message : "Failed to load SolarEdge data.");
     } finally {
@@ -791,8 +886,11 @@ viewModeButtons.forEach((button) => {
         updateViewModeUi();
 
         if (currentEnergyPayload) {
-            renderChart(currentEnergyPayload.points, currentEnergyPayload.meta);
-            chartMeta.textContent = buildChartMetaText(currentEnergyPayload.meta);
+            renderChart(currentEnergyPayload.points, currentEnergyPayload.meta, currentEnergyPayload.parityPoints ?? null);
+            chartMeta.textContent = buildChartMetaText(
+                currentEnergyPayload.meta,
+                Array.isArray(currentEnergyPayload.parityPoints) && currentEnergyPayload.parityPoints.length > 0,
+            );
         }
     });
 });
