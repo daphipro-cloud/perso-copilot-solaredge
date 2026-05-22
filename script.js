@@ -35,6 +35,81 @@ let dateBounds = {
 };
 const lineChartTimeUnits = new Set(["HOUR", "QUARTER_OF_AN_HOUR"]);
 
+const sunTimeMarkersPlugin = {
+    id: "sunTimeMarkers",
+    afterDatasetsDraw(chart, _args, pluginOptions) {
+        const markers = Array.isArray(pluginOptions?.markers) ? pluginOptions.markers : [];
+
+        if (!markers.length) {
+            return;
+        }
+
+        const xScale = chart.scales?.x;
+        const chartArea = chart.chartArea;
+
+        if (!xScale || !chartArea) {
+            return;
+        }
+
+        const { ctx } = chart;
+        const top = chartArea.top;
+        const bottom = chartArea.bottom;
+        const center = (chartArea.left + chartArea.right) / 2;
+        const isCompact = window.matchMedia("(max-width: 760px)").matches;
+
+        ctx.save();
+        ctx.setLineDash([6, 4]);
+        ctx.lineWidth = 1;
+        ctx.font = `${isCompact ? 10 : 12}px 'Segoe UI', sans-serif`;
+
+        markers.forEach((marker, markerIndex) => {
+            if (!Number.isInteger(marker.index) || marker.index < 0) {
+                return;
+            }
+
+            const x = xScale.getPixelForValue(marker.index);
+
+            ctx.strokeStyle = marker.color ?? "rgba(34, 90, 150, 0.75)";
+            ctx.beginPath();
+            ctx.moveTo(x, top);
+            ctx.lineTo(x, bottom);
+            ctx.stroke();
+
+            const text = marker.label ?? "";
+            if (!text) {
+                return;
+            }
+
+            const textWidth = ctx.measureText(text).width;
+            const paddingX = isCompact ? 5 : 7;
+            const paddingY = isCompact ? 3 : 4;
+            const textX = x > center ? x - 8 : x + 8;
+            const textY = markerIndex % 2 === 0 ? top + (isCompact ? 12 : 14) : bottom - (isCompact ? 12 : 14);
+            const align = x > center ? "right" : "left";
+            const boxWidth = textWidth + paddingX * 2;
+            const boxHeight = (isCompact ? 10 : 12) + paddingY * 2;
+            const boxLeft = align === "right"
+                ? textX - boxWidth
+                : textX;
+            const clampedBoxLeft = Math.max(chartArea.left + 2, Math.min(boxLeft, chartArea.right - boxWidth - 2));
+            const boxTop = textY - boxHeight / 2;
+
+            ctx.fillStyle = "rgba(11, 18, 23, 0.70)";
+            ctx.fillRect(clampedBoxLeft, boxTop, boxWidth, boxHeight);
+
+            ctx.fillStyle = marker.color ?? "rgba(34, 90, 150, 0.88)";
+            ctx.textAlign = align;
+            ctx.textBaseline = "middle";
+            const renderedTextX = align === "right"
+                ? clampedBoxLeft + boxWidth - paddingX
+                : clampedBoxLeft + paddingX;
+            ctx.fillText(text, renderedTextX, textY);
+        });
+
+        ctx.restore();
+    },
+};
+
 const syncViewportHeight = () => {
     document.documentElement.style.setProperty("--app-vh", `${window.innerHeight * 0.01}px`);
 };
@@ -713,6 +788,49 @@ const toPowerPointsFromEnergy = (energyPoints, timeUnit) => {
     });
 };
 
+const getSunTimeMarkers = ({ chartPoints, meta, hasParityPower }) => {
+    if (!isSingleDayRange(meta?.start, meta?.end) || !lineChartTimeUnits.has(meta?.timeUnit ?? "DAY")) {
+        return [];
+    }
+
+    if (!Array.isArray(chartPoints) || chartPoints.length < 2) {
+        return [];
+    }
+
+    const valueKey = hasParityPower ? "productionKw" : "productionKwh";
+    const threshold = hasParityPower ? 0.02 : 0.002;
+
+    const activeIndexes = chartPoints
+        .map((point, index) => ({
+            index,
+            value: Number(point?.[valueKey] ?? 0),
+            label: point?.label,
+        }))
+        .filter((entry) => entry.value > threshold);
+
+    if (!activeIndexes.length) {
+        return [];
+    }
+
+    const sunrisePoint = activeIndexes[0];
+    const sunsetPoint = activeIndexes[activeIndexes.length - 1];
+    const sunriseTime = formatLabel(sunrisePoint.label ?? "", meta.timeUnit);
+    const sunsetTime = formatLabel(sunsetPoint.label ?? "", meta.timeUnit);
+
+    return [
+        {
+            index: sunrisePoint.index,
+            label: `Sunrise ${sunriseTime}`,
+            color: "rgba(220, 120, 45, 0.88)",
+        },
+        {
+            index: sunsetPoint.index,
+            label: `Night ${sunsetTime}`,
+            color: "rgba(36, 78, 132, 0.88)",
+        },
+    ];
+};
+
 const buildChartOptions = ({
     rawLabels,
     showLineChart,
@@ -720,6 +838,7 @@ const buildChartOptions = ({
     hideLegend = false,
     yAxisUnit = "kWh",
     useAbsoluteTicks = true,
+    sunMarkers = [],
 }) => ({
     responsive: true,
     maintainAspectRatio: false,
@@ -746,6 +865,9 @@ const buildChartOptions = ({
                     return rawLabels[item.dataIndex] ?? item.label;
                 },
             },
+        },
+        sunTimeMarkers: {
+            markers: sunMarkers,
         },
     },
     scales: {
@@ -866,6 +988,11 @@ const renderChart = (energyPoints, meta, powerPoints = null) => {
     const rawLabels = chartPoints.map((point) => point.label);
     const labels = rawLabels.map((label) => formatLabel(label, timeUnit));
     const xAxisTickLimit = getXAxisTickLimit(timeUnit, chartPoints.length);
+    const sunMarkers = getSunTimeMarkers({
+        chartPoints,
+        meta,
+        hasParityPower,
+    });
     const datasets = hasParityPower
         ? buildPowerDatasets({ points: chartPoints, showLineChart, showSplitView })
         : buildDatasets({ points: chartPoints, showLineChart, showSplitView });
@@ -880,6 +1007,7 @@ const renderChart = (energyPoints, meta, powerPoints = null) => {
     }
 
     energyChart = new Chart(chartCanvas, {
+        plugins: [sunTimeMarkersPlugin],
         data: datasetConfig,
         options: buildChartOptions({
             rawLabels,
@@ -887,6 +1015,7 @@ const renderChart = (energyPoints, meta, powerPoints = null) => {
             xAxisTickLimit,
             yAxisUnit: hasParityPower ? "kW" : "kWh",
             useAbsoluteTicks: !hasParityPower,
+            sunMarkers,
         }),
     });
 };
